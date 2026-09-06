@@ -1,0 +1,81 @@
+{#- ---------------------------------------------------------------------
+   base.html — shared shell for every screen.
+
+   Blocks:  title · head · content · scripts
+   Context: request.args.mode == 'tv'  -> TV wall (dark, no chrome)
+            session.auth_user          -> logged in (from views/login.py)
+   Set active nav with:  {% set nav = 'overview' %}  (overview|sites|reports)
+   --------------------------------------------------------------------- #}
+{%- set tv = request.args.get('mode') == 'tv' -%}
+{%- set logged_in = session.get('auth_user') -%}
+<!doctype html>
+{%- set dark = ui_style == 'control' or (tv and ui_style == 'ledger') -%}
+<html lang="en" data-style="{{ ui_style }}" data-bs-theme="{{ 'dark' if dark else 'light' }}" class="{{ 'tv' if tv }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="{{ '#171a18' if dark else '#ffffff' }}">
+  <title>{% block title %}Swachh Andhra — Legacy waste remediation{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/left.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  {% if tv %}<meta http-equiv="refresh" content="1800">{% endif %}
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<header class="masthead d-flex align-items-center flex-wrap column-gap-3 row-gap-2">
+  <a class="brand" href="{{ url_for('overview.overview') }}">
+    <img src="{{ url_for('static', filename='img/left.png') }}" alt="Government of Andhra Pradesh">
+    <span>
+      <span class="brand-name d-block">Swachh Andhra</span>
+      <span class="brand-sub d-block">Legacy waste remediation</span>
+    </span>
+  </a>
+
+  <nav class="navpill" aria-label="Main">
+    <a href="{{ url_for('overview.overview') }}" class="{{ 'active' if nav == 'overview' }}">Overview</a>
+    <a href="{{ url_for('sites.sites_list') }}" class="{{ 'active' if nav == 'sites' }}">Sites{% if not logged_in %} <i class="bi bi-lock-fill"></i>{% endif %}</a>
+    <a href="{{ url_for('reports.reports_view') }}" class="{{ 'active' if nav == 'reports' }}">Reports{% if not logged_in %} <i class="bi bi-lock-fill"></i>{% endif %}</a>
+  </nav>
+
+  {% if not tv %}
+  <nav class="stylepill ms-auto only-screen" aria-label="Dashboard style">
+    {% for key, desc in ui_styles.items() %}
+      <a href="{{ url_for('set_style', name=key) }}" class="{{ 'active' if key == ui_style }}" title="{{ desc }}">
+        <span class="sw sw-{{ key }}"></span><span class="lbl">{{ key|capitalize }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <div class="{{ 'ms-auto' if tv }} d-flex align-items-center gap-2">
+    {% block masthead_right %}{% endblock %}
+    {% if not tv %}
+      <a class="pill only-screen d-none d-md-inline-flex" href="{{ url_for('overview.overview', mode='tv') }}" title="Full-screen wall display"><i class="bi bi-tv"></i> TV</a>
+      {% if logged_in %}
+        <a class="btn-cta" href="{{ url_for('login.logout_view') }}"><i class="bi bi-box-arrow-right"></i> Sign out</a>
+      {% else %}
+        <a class="btn-cta" href="{{ url_for('login.login_view') }}">Sign in</a>
+      {% endif %}
+    {% endif %}
+  </div>
+</header>
+
+<main class="page">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <span>Last updated {{ updated_at }}</span>
+  <span>·</span>
+  <span>Swachha Andhra Corporation, Government of Andhra Pradesh</span>
+  <span class="ms-auto">Built by Advitia Labs</span>
+</footer>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}" defer></script>
+<script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% set nav = 'overview' %}
+{% block title %}Overview — Swachh Andhra{% endblock %}
+
+{% block content %}
+{# TEMPORARY — layout preview only. Replaced in step 4 (Overview). #}
+<div class="page-head">
+  <div>
+    <h1>Project overview</h1>
+    <div class="sub">Real time as of {{ overview_date_str }} · {{ overview.total_sites }} sites · {{ agencies|length }} agencies</div>
+  </div>
+  <div class="d-flex gap-2">
+    <span class="chip">Deadline <strong>{{ deadline_str }}</strong></span>
+    <span class="chip"><strong>{{ days_left }}</strong> days left</span>
+  </div>
+</div>
+
+<section class="cards-4">
+  {% for card in overview_cards %}
+  <article class="hcard">
+    <div class="hcard-head">
+      <span class="hcard-title">{{ card.title }}</span>
+      {% if card.badge_text %}<span class="badge-soft">{{ card.badge_text }}</span>{% endif %}
+    </div>
+    {% if card.stats %}
+      <div><span class="stat">{{ card.stats[0].value }}</span><span class="stat-unit">{{ card.stats[0].label|lower }}</span></div>
+      <div class="bar"><span style="width:{{ card.badge_text|replace('%','') if card.badge_text and '%' in card.badge_text else 100 }}%"></span></div>
+      {% if card.stats|length > 1 %}<div class="stat-note">of <strong>{{ card.stats[1].value }}</strong> {{ card.stats[1].label|lower }}</div>{% endif %}
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+
+<p class="text-secondary mt-4 small">Layout preview — the cards above are wired to the existing <code>overview_cards()</code> only to prove the shell. The real overview lands in step 4.</p>
+{% endblock %}

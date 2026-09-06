@@ -1,0 +1,19 @@
+{# Minimal sign-in — restyled properly in step 3. Same field names views/login.py expects. #}
+{% extends "base.html" %}
+{% block title %}Sign in — Swachh Andhra{% endblock %}
+{% block content %}
+<div class="mx-auto" style="max-width:400px">
+  <div class="hcard">
+    <h1 class="fs-4 mb-0">{% if site_name %}Sign in to {{ site_name }}{% else %}Sign in{% endif %}</h1>
+    {% if error %}<div class="alert alert-danger py-2 mb-0">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ form_action or url_for('login.login_view') }}" class="d-flex flex-column gap-3">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
+      <label class="form-label mb-0">Username <input class="form-control" name="username" autocomplete="username" required></label>
+      <label class="form-label mb-0">Password <input class="form-control" type="password" name="password" autocomplete="current-password" required></label>
+      <label class="form-label mb-0">Security check · {{ captcha_question }} <input class="form-control" name="captcha_answer" inputmode="numeric" required></label>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
