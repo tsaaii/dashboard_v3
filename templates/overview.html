@@ -1,13 +1,11 @@
 {% extends "base.html" %}
-{% set nav = 'overview' %}
 {% block title %}Overview — Swachh Andhra{% endblock %}
 
 {% block content %}
-{# TEMPORARY — layout preview only. Replaced in step 4 (Overview). #}
 <div class="page-head">
   <div>
     <h1>Project overview</h1>
-    <div class="sub">Real time as of {{ overview_date_str }} · {{ overview.total_sites }} sites · {{ agencies|length }} agencies</div>
+    <div class="sub">Real time as of {{ today_str }} · {{ ov.total_sites }} sites, {{ ov.active_sites }} active · {{ agencies|length }} agencies</div>
   </div>
   <div class="d-flex gap-2">
     <span class="chip">Deadline <strong>{{ deadline_str }}</strong></span>
@@ -15,21 +13,83 @@
   </div>
 </div>
 
-<section class="cards-4">
-  {% for card in overview_cards %}
-  <article class="hcard">
-    <div class="hcard-head">
-      <span class="hcard-title">{{ card.title }}</span>
-      {% if card.badge_text %}<span class="badge-soft">{{ card.badge_text }}</span>{% endif %}
-    </div>
-    {% if card.stats %}
-      <div><span class="stat">{{ card.stats[0].value }}</span><span class="stat-unit">{{ card.stats[0].label|lower }}</span></div>
-      <div class="bar"><span style="width:{{ card.badge_text|replace('%','') if card.badge_text and '%' in card.badge_text else 100 }}%"></span></div>
-      {% if card.stats|length > 1 %}<div class="stat-note">of <strong>{{ card.stats[1].value }}</strong> {{ card.stats[1].label|lower }}</div>{% endif %}
-    {% endif %}
-  </article>
-  {% endfor %}
+{# ---- 1. Project tiles ---- #}
+<section class="cards-4 mb-4" aria-label="Project totals">
+  {% with title="Remediated", value=ov.total_remediated_mt, target=ov.total_target_mt, unit="MT", pct=ov.overall_completion_pct, note="total target" %}{% include "partials/progress_card.html" %}{% endwith %}
+  {% with title="RDF disposal", value=ov.rdf_disposed_mt, target=ov.rdf_expected_mt, unit="MT", pct=ov.rdf_disposed_mt|share(ov.rdf_expected_mt), note="expected (15% of target)" %}{% include "partials/progress_card.html" %}{% endwith %}
+  {% with title="Today's pace", today_mt=ov.today_mt, required=ov.required_today_mt %}{% include "partials/pace_card.html" %}{% endwith %}
+  {% with n_sites=ov.total_sites, b100=ov.recl_100, b75=ov.recl_75_99, b50=ov.recl_50_75, blow=ov.recl_below_50 %}{% include "partials/buckets_card.html" %}{% endwith %}
 </section>
 
-<p class="text-secondary mt-4 small">Layout preview — the cards above are wired to the existing <code>overview_cards()</code> only to prove the shell. The real overview lands in step 4.</p>
+{# ---- 2. Disposal split ---- #}
+<section class="hcard mb-4 tv-hide" aria-label="Disposal split">
+  <div class="hcard-head">
+    <span class="hcard-title">Disposal split · outward processing</span>
+    <span class="stat-note"><strong>{{ split_total|inr }} MT</strong> disposed of {{ ov.total_remediated_mt|inr }} MT remediated</span>
+  </div>
+  {% with total=split_total %}{% include "partials/split_bar.html" %}{% endwith %}
+</section>
+
+{# ---- 3. Rotating agency slides ---- #}
+<section class="rotator" id="rotator" data-interval="{{ rotation_ms }}" aria-label="Remediated">
+  <div class="rotator-head">
+    <button class="rot-nav" type="button" data-rot="prev" aria-label="Previous agency"><i class="bi bi-chevron-left"></i></button>
+    <div class="rot-titles">
+      {% for a in agencies %}
+      <div class="rot-title{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}">
+        <h2>{{ a.m.display_name }}</h2>
+        <div class="sub">{{ a.m.total_sites }} site{{ '' if a.m.total_sites == 1 else 's' }} · {{ a.m.active_sites }} active · {{ a.m.clusters|length }} cluster{{ '' if a.m.clusters|length == 1 else 's' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="rot-dots" role="tablist">
+      {% for a in agencies %}<button type="button" role="tab" class="rot-dot{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}" title="{{ a.m.display_name }}" aria-label="{{ a.m.display_name }}"></button>{% endfor %}
+    </div>
+    <button class="rot-nav" type="button" data-rot="next" aria-label="Next agency"><i class="bi bi-chevron-right"></i></button>
+  </div>
+  <div class="rot-progress"><span></span></div>
+
+  {% for a in agencies %}{% set m = a.m %}
+  <div class="rot-slide{% if loop.first %} is-active{% endif %}" data-slide="{{ loop.index0 }}">
+    <div class="cards-4 mb-3">
+      {% with title="Remediated", value=m.remediated_mt, target=m.target_mt, unit="MT", pct=m.completion_pct, note="target" %}{% include "partials/progress_card.html" %}{% endwith %}
+      {% with title="RDF disposal", value=m.rdf_disposed_mt, target=m.rdf_expected_mt, unit="MT", pct=m.rdf_disposed_mt|share(m.rdf_expected_mt), note="expected" %}{% include "partials/progress_card.html" %}{% endwith %}
+      {% with title="Today's pace", today_mt=m.today_mt, required=m.daily_rate_required, pace=a.pace %}{% include "partials/pace_card.html" %}{% endwith %}
+      {% with n_sites=m.total_sites, b100=m.recl_100, b75=m.recl_75_99, b50=m.recl_50_75, blow=m.recl_below_50 %}{% include "partials/buckets_card.html" %}{% endwith %}
+    </div>
+    <div class="cards-4">
+      {# Outward pending #}
+      <article class="hcard">
+        <div class="hcard-head">
+          <span class="hcard-title">Outward processing</span>
+          <span class="badge-soft {{ 'bad' if m.no_outward_sites else '' }}">{{ (m.no_outward_sites|length ~ ' pending') if m.no_outward_sites else 'All clear' }}</span>
+        </div>
+        {% if m.no_outward_sites %}
+        <ul class="rows">
+          {% for s in m.no_outward_sites[:5] %}<li><a href="{{ url_for('sites.site_view', slug=s.slug) }}">{{ s.site_name }}</a><span class="c-bad">No outward yet</span></li>{% endfor %}
+        </ul>
+        {% else %}<p class="stat-note mb-0">Every active site has started outward processing.</p>{% endif %}
+      </article>
+      {# Lagging #}
+      <article class="hcard">
+        <div class="hcard-head"><span class="hcard-title">Lagging sites</span><span class="badge-soft neutral">lowest 5</span></div>
+        <ul class="rows rows-bars">
+          {% for r in a.lagging %}{% set p = r.completion_pct %}{% set c = 'ok' if p >= 100 else 'info' if p >= 80 else 'warn' if p >= 50 else 'bad' %}
+          <li><span>{{ r.site_name }}</span><span class="c-{{ c }}">{{ p|pct }}</span><span class="bar"><span class="{{ c }}" style="width:{{ '%.1f'|format(p if p < 100 else 100) }}%"></span></span></li>
+          {% else %}<li><span class="text-secondary">No active sites</span></li>{% endfor %}
+        </ul>
+      </article>
+      {# Disposal split #}
+      <article class="hcard">
+        <div class="hcard-head"><span class="hcard-title">Disposal split</span><span class="badge-soft neutral">{{ (a.split|sum(attribute=1))|inr }} MT</span></div>
+        {% with split=a.split, total=a.split|sum(attribute=1) %}{% include "partials/split_bar.html" %}{% endwith %}
+      </article>
+      {# Land #}
+      {% with title="Land reclaimed", value=m.land_reclaimed_acres, target=m.land_to_reclaim_acres, unit="acres", pct=m.land_reclaimed_acres|share(m.land_to_reclaim_acres), note="to be reclaimed" %}{% include "partials/progress_card.html" %}{% endwith %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/rotation.js') }}" defer></script>{% endblock %}

@@ -13,12 +13,16 @@ Default credentials below: admin / haritha2026
 """
 from __future__ import annotations
 
+import os
+
 from werkzeug.security import check_password_hash
 
 
 # ---- Edit me to change credentials ----
-USERNAME = "admin"
-PASSWORD_HASH = (
+# Production: set ADMIN_USERNAME / ADMIN_PASSWORD_HASH as env vars (Cloud Run
+# secrets). The values below are only the local-dev fallback.
+USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH") or (
 "scrypt:32768:8:1$bHc2khMSZZnVS1BY$04bf51cf4894944eec0a6c835a50d436b660c4162cd53903e5b2f4175bed4166ec4ba3cad511022016a56611dac01c46c52bc1ca0e052ecf444188a075314fcb"
 )
 

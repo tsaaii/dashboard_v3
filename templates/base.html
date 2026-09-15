@@ -36,15 +36,19 @@
 
   <nav class="navpill" aria-label="Main">
     <a href="{{ url_for('overview.overview') }}" class="{{ 'active' if nav == 'overview' }}">Overview</a>
-    <a href="{{ url_for('sites.sites_list') }}" class="{{ 'active' if nav == 'sites' }}">Sites{% if not logged_in %} <i class="bi bi-lock-fill"></i>{% endif %}</a>
+    <a href="{{ url_for('ulb.ulb_view') }}" class="{{ 'active' if nav in ('ulb', 'sites') }}">Data by ULB</a>
     <a href="{{ url_for('reports.reports_view') }}" class="{{ 'active' if nav == 'reports' }}">Reports{% if not logged_in %} <i class="bi bi-lock-fill"></i>{% endif %}</a>
+    {% if is_admin %}<a href="{{ url_for('admin.admin_home') }}" class="{{ 'active' if nav == 'admin' }}"><i class="bi bi-gear"></i> Admin</a>{% endif %}
   </nav>
 
   {% if not tv %}
   <nav class="stylepill ms-auto only-screen" aria-label="Dashboard style">
-    {% for key, desc in ui_styles.items() %}
-      <a href="{{ url_for('set_style', name=key) }}" class="{{ 'active' if key == ui_style }}" title="{{ desc }}">
-        <span class="sw sw-{{ key }}"></span><span class="lbl">{{ key|capitalize }}</span>
+    {% for key, st in ui_styles.items() %}{% set c = st.colors %}
+      <a href="{{ url_for('set_style', name=key) }}" class="{{ 'active' if key == ui_style }}" title="{{ st.desc }}" aria-label="{{ st.desc }}">
+        <svg class="sw" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" fill="{{ c[0] }}" stroke="rgba(0,0,0,.2)"/>
+          <path d="M12 1a11 11 0 0 1 0 22z" fill="{{ c[1] }}"/>
+        </svg>
       </a>
     {% endfor %}
   </nav>

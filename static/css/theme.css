@@ -394,3 +394,76 @@ h1,h2,h3,h4{font-family:var(--font-head);font-weight:600;letter-spacing:-.02em}
 .th-sort:hover{color:var(--ink)} .th-sort:hover .bi{opacity:.7}
 .th-sort.is-active{color:var(--accent)} .th-sort.is-active .bi{opacity:1}
 .sites-table th:nth-child(6){width:200px}
+
+/* =====================================================================
+   12. Data by ULB
+   ===================================================================== */
+:root{--seg-rdf:var(--accent);--seg-inert:color-mix(in srgb,var(--accent) 55%,var(--ink) 45%);--seg-soil:color-mix(in srgb,var(--accent) 50%,var(--bg) 50%);--seg-cnd:color-mix(in srgb,var(--accent) 30%,var(--ink3) 70%);--seg-gap:var(--surface2)}
+.useg{display:flex;height:6px;border-radius:4px;background:var(--surface2);overflow:hidden;width:100%}
+.useg>span{display:block;height:100%}
+.useg-lg{height:10px;border-radius:5px}
+.useg-rdf{background:var(--seg-rdf)}.useg-inert{background:var(--seg-inert)}.useg-soil{background:var(--seg-soil)}.useg-cnd{background:var(--seg-cnd)}
+i.useg-rdf,i.useg-inert,i.useg-soil,i.useg-cnd,i.useg-gap{display:inline-block;width:.6em;height:.6em;border-radius:2px;margin-right:6px;vertical-align:middle}
+i.useg-gap{background:var(--seg-gap);border:1px solid var(--line)}
+.u-legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:calc(12 * var(--fz));color:var(--ink2);white-space:nowrap}
+.u-legend strong{color:var(--ink)}
+.u-legend-col{display:flex;flex-direction:column;gap:4px;font-size:calc(12.5 * var(--fz))}
+.u-legend-col>div{display:flex;justify-content:space-between;gap:12px}
+.u-tabs{display:inline-flex;padding:3px;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);flex-wrap:wrap;box-shadow:var(--shadow)}
+.u-tabs a{display:inline-flex;align-items:center;gap:6px;padding:.4em .9em;border-radius:var(--r-sm);font-size:calc(13 * var(--fz));font-weight:600;color:var(--ink2);text-decoration:none;white-space:nowrap}
+.u-tabs a:hover{background:var(--accent-soft);color:var(--ink)}
+.u-tabs a.is-active{background:var(--accent);color:var(--accent-ink)}
+.u-tabs a .bi{font-size:.85em;opacity:.8}
+.cards-4 .u-legend{white-space:normal}
+.u-empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r-lg);padding:64px 24px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.u-empty p{max-width:560px}
+.page>*+*{margin-top:20px}
+.page>.page-head{margin-bottom:0}
+
+/* roll-up */
+.u-roll summary{list-style:none;display:flex;align-items:center;gap:12px;cursor:pointer}
+.u-roll summary::-webkit-details-marker{display:none}
+.u-rollitems{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;width:100%;margin-top:6px}
+.u-rollitem{display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-md);cursor:pointer;opacity:.7;font-size:calc(13 * var(--fz))}
+.u-rollitem.is-on{border-color:var(--accent);background:var(--accent-soft);opacity:1}
+.u-rollbox{width:1.3em;height:1.3em;border:1px solid var(--ink3);border-radius:4px;display:grid;place-items:center;flex:none;font-size:.9em}
+.is-on .u-rollbox{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.u-rollsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;padding-top:16px;border-top:1px solid var(--line)}
+
+/* grouped table */
+.u-table{font-size:calc(13 * var(--fz))}
+.u-line{display:grid;grid-template-columns:1.6em minmax(180px,2fr) minmax(120px,1.4fr) 120px 120px 90px minmax(150px,1fr) 2em;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.u-thead{background:var(--surface2);font-size:calc(12 * var(--fz));font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink)}
+.u-thead .th-sort{color:var(--ink2)} .u-thead .th-sort:hover{color:var(--ink)} .u-thead .th-sort.is-active{color:var(--accent)}
+.u-thead .th-sort:nth-child(4),.u-thead .th-sort:nth-child(5),.u-thead .th-sort:nth-child(6){justify-self:end}
+summary.u-line{list-style:none;cursor:pointer}
+summary.u-line::-webkit-details-marker{display:none}
+summary.u-line:hover{background:var(--surface2)}
+.u-ghead{background:color-mix(in srgb,var(--accent-soft) 60%,var(--surface));font-weight:600}
+.u-shead{background:var(--surface2);font-weight:500}
+.u-shead .u-name{padding-left:1em}
+.u-row .u-name{padding-left:1em}
+.u-section .u-row .u-name{padding-left:2.2em}
+.u-chev{width:1.5em;height:1.5em;flex:none;border:1px solid var(--line);border-radius:50%;display:inline-grid;place-items:center;font-size:.85em;color:var(--ink2);background:var(--surface);transition:transform .2s ease}
+details[open]>summary>.u-chev{transform:rotate(90deg)}
+.u-name{display:flex;flex-direction:column;min-width:0}
+.u-title{font-weight:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-sub{font-size:.85em;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u-meta{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-num{text-align:right;font-variant-numeric:tabular-nums}
+.u-pctv{font-weight:600}
+.u-disp{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.u-total{background:var(--accent-soft);font-weight:600;border-top:2px solid var(--accent);border-bottom:0}
+.u-total .u-sub{font-weight:400}
+.u-ctl{width:260px;max-width:100%}
+.u-open{color:var(--ink3)} .u-open:hover{color:var(--accent)}
+.u-detail{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:24px;padding:16px 16px 18px 3.4em;background:var(--bg);border-bottom:1px solid var(--line)}
+.u-meta-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:calc(12.5 * var(--fz))}
+.u-meta-grid dt{color:var(--ink3);font-weight:500}.u-meta-grid dd{margin:0}
+.u-other{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:calc(12.5 * var(--fz))}
+.u-foot{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 16px;font-size:calc(12 * var(--fz));color:var(--ink2)}
+@media (max-width:900px){
+  .u-line,.u-thead{grid-template-columns:1.6em 1fr 90px 90px 2em}
+  .u-meta,.u-pctv,.u-disp,.u-thead>*:nth-child(3),.u-thead>*:nth-child(6),.u-thead>*:nth-child(7){display:none}
+  .u-detail{grid-template-columns:1fr;padding-left:16px}
+}

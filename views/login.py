@@ -31,12 +31,23 @@ from flask import (
 )
 
 import captcha
+import mailer
 from auth import USERNAME, verify_credentials
+from data import users
 
 
 bp = Blueprint("login", __name__)
 
 SESSION_USER_KEY = "auth_user"
+SESSION_SCOPE_KEY = "auth_scope"      # "admin" | "all" | <site slug>
+
+
+def current_scope() -> str:
+    return session.get(SESSION_SCOPE_KEY) or ""
+
+
+def is_admin() -> bool:
+    return current_scope() == "admin"
 
 
 # --------------------------------------------------------------------------
@@ -49,6 +60,18 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         if not session.get(SESSION_USER_KEY):
             return redirect(url_for("login.login_view", next=request.path))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    """403 unless the session scope is admin."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get(SESSION_USER_KEY):
+            return redirect(url_for("login.login_view", next=request.path))
+        if not is_admin():
+            return "Admin access required", 403
         return view(*args, **kwargs)
     return wrapped
 
@@ -128,7 +151,14 @@ def login_view():
     # 3. credentials
     username = (request.form.get("username") or "").strip()
     password = request.form.get("password") or ""
-    if not verify_credentials(username, password):
+    scope = None
+    if verify_credentials(username, password):
+        scope = "admin"                                   # env-var admin
+    else:
+        u = users.authenticate(username, password)
+        if u:
+            scope = u["scope"]
+    if scope is None:
         count, just_blocked = captcha.register_failure(ip)
         current_app.logger.info(
             "Failed login user=%r ip=%s count=%d", username, ip, count,
@@ -147,12 +177,50 @@ def login_view():
     # 4. success
     captcha.clear_failures(ip)
     session.clear()
-    session[SESSION_USER_KEY] = USERNAME
     session.permanent = True
+    if scope in ("admin", "all"):
+        session[SESSION_USER_KEY] = username.strip().lower()
+        session[SESSION_SCOPE_KEY] = scope
+        if _is_safe_redirect_target(next_url):
+            return redirect(next_url)
+        return redirect(url_for("admin.admin_home") if scope == "admin" else url_for("sites.sites_list"))
+    # site-scoped user: unlock just that site
+    session["site_auth"] = [scope]
+    return redirect(url_for("sites.site_view", slug=scope))
 
-    if _is_safe_redirect_target(next_url):
-        return redirect(next_url)
-    return redirect(url_for("reports.reports_view"))
+
+# --------------------------------------------------------------------------
+# Request access — emails the admin; same captcha + rate limit as login
+# --------------------------------------------------------------------------
+
+FIELDS = ("name", "designation", "organisation", "email", "phone", "site", "reason")
+
+
+def _request_form(error=None, sent=None, values=None, status=200):
+    return render_template("request_access.html", error=error, sent=sent,
+                           values=values or {},
+                           captcha_question=captcha.current_question(),
+                           captcha_nonce=captcha.current_nonce()), status
+
+
+@bp.route("/request-access", methods=["GET", "POST"])
+def request_access():
+    if request.method == "GET":
+        return _request_form()
+
+    values = {k: (request.form.get(k) or "").strip()[:500] for k in FIELDS}
+    ip = captcha.client_ip()
+    blocked, retry = captcha.is_blocked(ip)
+    if blocked:
+        return _request_form(f"Too many attempts. Try again in {max(1, retry // 60)} minute(s).", values=values, status=429)
+    if not captcha.verify(request.form.get("captcha_answer", ""), nonce=request.form.get("captcha_nonce", "")):
+        return _request_form("Security check was incorrect. Please try again.", values=values, status=400)
+    if not (values["name"] and values["designation"] and values["site"] and values["email"]):
+        return _request_form("Name, designation, email and site are required.", values=values, status=400)
+
+    values["ip"] = ip
+    sent = mailer.send_access_request(values)
+    return _request_form(sent=True if sent else "logged")
 
 
 @bp.route("/logout")

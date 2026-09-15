@@ -5,7 +5,8 @@ Routes
     GET  /                 public overview (4 project tiles + rotating agency slide)
     GET  /?mode=tv         same page, TV-wall layout
     GET  /style/<name>     pick one of four UI styles (cookie), redirect back
-    GET  /sites            sites list            (login)      views/sites.py
+    GET  /ulb              Data by ULB (public)               views/ulb.py
+    GET  /sites            redirects to /ulb
     GET  /sites/<slug>     site detail           (login)      views/sites.py
     GET  /reports          records explorer      (login)      views/reports.py
     GET/POST /login, GET /logout                              views/login.py
@@ -31,6 +32,7 @@ from views.login import bp as login_bp, is_admin, login_required
 from views.overview import bp as overview_bp
 from views.reports import bp as reports_bp
 from views.sites import bp as sites_bp
+from views.ulb import bp as ulb_bp
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
@@ -77,6 +79,7 @@ def create_app() -> Flask:
     app.register_blueprint(overview_bp)
     app.register_blueprint(login_bp)
     app.register_blueprint(sites_bp)
+    app.register_blueprint(ulb_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(admin_bp)
 

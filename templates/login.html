@@ -1,19 +1,37 @@
-{# Minimal sign-in — restyled properly in step 3. Same field names views/login.py expects. #}
 {% extends "base.html" %}
 {% block title %}Sign in — Swachh Andhra{% endblock %}
 {% block content %}
-<div class="mx-auto" style="max-width:400px">
-  <div class="hcard">
-    <h1 class="fs-4 mb-0">{% if site_name %}Sign in to {{ site_name }}{% else %}Sign in{% endif %}</h1>
+<div class="auth">
+  <aside class="auth-side">
+    <img src="{{ url_for('static', filename='img/left.png') }}" alt="" class="auth-emblem">
+    <h1>{% if site_name %}{{ site_name }}{% else %}Swachh Andhra{% endif %}</h1>
+    <p>{% if site_name %}Live weighbridge records, day-wise summaries and PDF reports for this site.{% else %}Legacy waste remediation across {{ 'all' }} sites — live records, day-wise summaries and reports for officials and agency staff.{% endif %}</p>
+    <ul class="auth-points">
+      <li><i class="bi bi-truck"></i> Every trip, as the weighbridge records it</li>
+      <li><i class="bi bi-calendar3"></i> Day-wise tonnage by material</li>
+      <li><i class="bi bi-file-earmark-pdf"></i> Reports you can download and share</li>
+    </ul>
+    <div class="auth-deadline"><span>Project deadline</span><strong>{{ deadline_str }}</strong><span>{{ days_left }} days left</span></div>
+  </aside>
+
+  <div class="hcard auth-card">
+    <div>
+      <h2>Sign in</h2>
+      <p class="text-secondary mb-0">{% if site_name %}Use this site's login, or the admin login.{% else %}The overview is public; everything else needs a login.{% endif %}</p>
+    </div>
     {% if error %}<div class="alert alert-danger py-2 mb-0">{{ error }}</div>{% endif %}
-    <form method="post" action="{{ form_action or url_for('login.login_view') }}" class="d-flex flex-column gap-3">
+    <form method="post" action="{{ form_action or url_for('login.login_view') }}" class="auth-form" autocomplete="off">
       <input type="hidden" name="next" value="{{ next_url }}">
       <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
-      <label class="form-label mb-0">Username <input class="form-control" name="username" autocomplete="username" required></label>
-      <label class="form-label mb-0">Password <input class="form-control" type="password" name="password" autocomplete="current-password" required></label>
-      <label class="form-label mb-0">Security check · {{ captcha_question }} <input class="form-control" name="captcha_answer" inputmode="numeric" required></label>
-      <button class="btn btn-primary" type="submit">Sign in</button>
+      <label class="field">Username<span class="input-icon"><i class="bi bi-person"></i><input class="form-control" name="username" autocomplete="username" autofocus required spellcheck="false" autocapitalize="none"></span></label>
+      <label class="field">Password<span class="input-icon"><i class="bi bi-key"></i><input class="form-control" type="password" name="password" autocomplete="current-password" required></span></label>
+      <label class="field">Security check · <strong>{{ captcha_question }} = ?</strong><span class="input-icon"><i class="bi bi-shield-check"></i><input class="form-control" name="captcha_answer" inputmode="numeric" placeholder="Answer" required></span></label>
+      <button class="btn btn-primary btn-lg" type="submit">Sign in <i class="bi bi-arrow-right"></i></button>
     </form>
+    <div class="auth-foot">
+      <a href="{{ url_for('login.request_access') }}">Request access</a>
+      <a href="{{ url_for('overview.overview') }}">Back to the dashboard</a>
+    </div>
   </div>
 </div>
 {% endblock %}
