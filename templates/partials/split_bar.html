@@ -1,0 +1,9 @@
+{#- Disposal split bar + legend. args: split [(label, value, colorkey)], total -#}
+<div class="split">
+  {% for label, v, c in split %}<span class="bg-{{ c }}" style="width:{{ '%.1f'|format(v|share(total)) }}%" title="{{ label }}: {{ v|inr }} MT"></span>{% endfor %}
+</div>
+<div class="legend">
+  {% for label, v, c in split %}
+  <div><span class="sw bg-{{ c }}"></span><span class="text-secondary">{{ label }}</span><strong>{{ v|inr }} MT</strong><span class="text-tertiary">{{ (v|share(total))|pct }}</span></div>
+  {% endfor %}
+</div>

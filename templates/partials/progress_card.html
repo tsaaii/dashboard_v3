@@ -1,0 +1,11 @@
+{#- One "value of target" tile with a progress bar.
+    args: title, value, target, unit, pct, note, badge_class(optional) -#}
+<article class="hcard">
+  <div class="hcard-head">
+    <span class="hcard-title">{{ title }}</span>
+    <span class="badge-soft {{ badge_class or '' }}">{{ pct|pct }}</span>
+  </div>
+  <div><span class="stat">{{ value|inr }}</span><span class="stat-unit">{{ unit }}</span></div>
+  <div class="bar"><span style="width:{{ '%.1f'|format(pct if pct < 100 else 100) }}%"></span></div>
+  <div class="stat-note">of <strong>{{ target|inr }} {{ unit }}</strong> {{ note }}</div>
+</article>

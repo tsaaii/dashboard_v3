@@ -1,0 +1,10 @@
+{#- Today's tonnage vs required. args: title, today_mt, required, pace(dict), clock -#}
+<article class="hcard">
+  <div class="hcard-head">
+    <span class="hcard-title">{{ title }}</span>
+    <span class="badge-soft {{ '' if pace.ok else 'warn' }}"><span class="dot"></span>{{ pace.label }}</span>
+  </div>
+  <div><span class="stat">{{ today_mt|inr }}</span><span class="stat-unit">MT today</span></div>
+  <div class="bar"><span class="{{ 'ok' if pace.ok else 'warn' }}" style="width:{{ '%.1f'|format(pace.share) }}%"></span></div>
+  <div class="stat-note">required <strong>{{ required|inr }} MT/day</strong> · {{ clock }} IST</div>
+</article>

@@ -11,3 +11,5 @@ venv/
 sites_master.csv
 overrides.csv
 *.pdf
+users.csv
+sites_phases.csv

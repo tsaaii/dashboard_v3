@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ site.site_name }} — Swachh Andhra{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="small text-secondary"><a class="text-decoration-none" href="{{ url_for('sites.sites_list') }}">Sites</a> / {{ site.agency_name }}</div>
+    <h1>{{ site.site_name }}</h1>
+    <div class="sub">{{ site.cluster }} cluster · started {{ site.start_date.strftime('%d %b %Y') if site.start_date else '—' }} · deadline {{ site.deadline_date.strftime('%d %b %Y') if site.deadline_date else deadline_str }}</div>
+  </div>
+  <div class="d-flex gap-2"><span class="chip"><strong>{{ t.days_left }}</strong> days left</span></div>
+</div>
+
+<section class="cards-4 mb-4">
+  {% with title="Remediated", value=t.remediated, target=t.target, unit="MT", pct=t.pct, note="target · " ~ (t.remaining|inr) ~ " MT remaining" %}{% include "partials/progress_card.html" %}{% endwith %}
+  <article class="hcard">
+    <div class="hcard-head"><span class="hcard-title">Today's pace</span>
+      {% if pace is none %}<span class="badge-soft neutral">API offline</span>
+      {% elif t.required == 0 or pace >= t.required * 0.8 %}<span class="badge-soft"><span class="dot"></span>On track</span>
+      {% else %}<span class="badge-soft bad"><span class="dot"></span>Behind</span>{% endif %}
+    </div>
+    <div><span class="stat">{{ '—' if pace is none else '%.1f'|format(pace) }}</span><span class="stat-unit">MT legacy today</span></div>
+    <div class="bar"><span class="{{ 'ok' if pace is not none and (t.required == 0 or pace >= t.required*0.8) else 'bad' }}" style="width:{{ '%.1f'|format((pace / t.required * 100) if pace and t.required else 0) if (pace or 0) / (t.required or 1) < 1 else 100 }}%"></span></div>
+    <div class="stat-note">required <strong>{{ '%.1f'|format(t.required) }} MT/day</strong> · avg so far {{ '%.1f'|format(t.avg_per_day) }} MT/day</div>
+  </article>
+  <article class="hcard">
+    <div class="hcard-head"><span class="hcard-title">Disposed</span><span class="badge-soft">{{ t.disposal_pct|pct }}</span></div>
+    <div><span class="stat">{{ t.disposed|inr }}</span><span class="stat-unit">MT disposed</span></div>
+    {% with split=t.split, total=t.disposed %}{% include "partials/split_bar.html" %}{% endwith %}
+  </article>
+  <article class="hcard">
+    <div class="hcard-head"><span class="hcard-title">Land</span><span class="badge-soft">{{ (site.land_reclaimed_acres|share(site.land_total_acres))|pct }}</span></div>
+    <div><span class="stat">{{ '%.1f'|format(site.land_reclaimed_acres) }}</span><span class="stat-unit">acres reclaimed</span></div>
+    <div class="bar"><span style="width:{{ '%.1f'|format(site.land_reclaimed_acres|share(site.land_total_acres)) }}%"></span></div>
+    <div class="stat-note">of <strong>{{ '%.1f'|format(site.land_total_acres) }} acres</strong> · {{ site.reclamation_status or '—' }}</div>
+  </article>
+</section>
+
+{# Records explorer: the form re-fetches the fragment via HTMX; no page reload #}
+<section class="hcard mb-4">
+  <div class="hcard-head"><span class="hcard-title">Records explorer</span><span class="text-tertiary small">live weighbridge records</span></div>
+  <form class="d-flex flex-wrap gap-2 align-items-end" hx-get="{{ url_for('sites.site_records', slug=site.slug) }}" hx-target="#records" hx-indicator="#records-busy" hx-trigger="submit, load">
+    <label class="field">From<input class="form-control" type="date" name="start" value="{{ start }}"></label>
+    <label class="field">To<input class="form-control" type="date" name="end" value="{{ end }}"></label>
+    <label class="field">Material<select class="form-select" name="material"><option value="">All</option>{% for m in ["Legacy/MSW","Soil","RDF","Inert","C&D"] %}<option>{{ m }}</option>{% endfor %}</select></label>
+    <label class="field">Vehicle<input class="form-control" name="vehicle" placeholder="AP39…" style="width:140px"></label>
+    <button class="btn btn-primary">Apply</button>
+    <span id="records-busy" class="htmx-indicator text-secondary small">Loading…</span>
+  </form>
+  <div id="records"><p class="text-secondary small mb-0">Loading records…</p></div>
+</section>
+
+<section class="hcard">
+  <div class="hcard-head"><span class="hcard-title">Day-wise summary</span><span class="text-tertiary small">per material type</span></div>
+  <form class="d-flex flex-wrap gap-2 align-items-end" hx-get="{{ url_for('sites.site_daywise_view', slug=site.slug) }}" hx-target="#daywise" hx-trigger="submit, load">
+    <label class="field">From<input class="form-control" type="date" name="start" value="{{ start }}"></label>
+    <label class="field">To<input class="form-control" type="date" name="end" value="{{ end }}"></label>
+    <label class="field">Transfer party<select class="form-select" name="party" id="party-select"><option value="">All</option></select></label>
+    <button class="btn btn-primary">Apply</button>
+  </form>
+  <div id="daywise"><p class="text-secondary small mb-0">Loading…</p></div>
+</section>
+{% endblock %}

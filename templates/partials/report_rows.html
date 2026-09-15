@@ -1,0 +1,23 @@
+{% if meta.error %}<div class="alert alert-warning py-2">Weighbridge API: {{ meta.error }}</div>{% endif %}
+<div class="d-flex justify-content-between align-items-center mb-2 small text-secondary">
+  <span><strong class="text-body">{{ total|inr }}</strong> records · page {{ page }} of {{ pages }}</span>
+  <span class="text-tertiary">{{ meta.took_ms }} ms{{ ' · cached' if meta.cached }}</span>
+</div>
+<div class="table-responsive">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Date</th><th>Time</th><th>Ticket</th><th>Site</th><th>Agency</th><th>Vehicle</th><th>Material</th><th>Transfer party</th><th class="text-end">Net kg</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+  <tr><td>{{ r.date }}</td><td>{{ (r.time or '')[:5] }}</td><td>{{ r.ticket_no }}</td><td>{{ r.site_name }}</td><td class="text-secondary">{{ r.agency_name }}</td><td>{{ r.vehicle_no }}</td><td>{{ r.material_type or r.material }}</td><td class="text-secondary">{{ r.transfer_party_name or '—' }}</td><td class="text-end fw-semibold">{{ r.net_weight|inr }}</td></tr>
+  {% else %}<tr><td colspan="9" class="text-center text-secondary py-4">No records match.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<div class="d-flex justify-content-between align-items-center mt-3">
+  {# these buttons re-use the form's filters and just change the page #}
+  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page <= 1 }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-vals='{"page": {{ page - 1 }}}' hx-target="#rows">← Previous</button>
+  <span class="small text-secondary">Page {{ page }} / {{ pages }}</span>
+  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page >= pages }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-vals='{"page": {{ page + 1 }}}' hx-target="#rows">Next →</button>
+</div>
+{% endif %}

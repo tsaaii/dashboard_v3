@@ -62,7 +62,7 @@ gcloud run deploy dashboard-v3 --source . --region asia-south1 --allow-unauthent
 
 `--source .` builds the container for you from `requirements.txt` + `Procfile`; no Dockerfile.
 `--min-instances 1` keeps the TV wall from hitting a cold start.
-The Cloud Run service account needs `roles/storage.objectViewer` on the bucket.
+The Cloud Run service account needs `roles/storage.objectAdmin` on the bucket (the /admin page writes `sites_master.csv` and `users.csv` there).
 
 Custom domain: `gcloud run domain-mappings create --service dashboard-v3 --domain <your-domain>`
 then add the DNS records it prints.
@@ -77,14 +77,42 @@ Logs: `gcloud run services logs tail dashboard-v3 --region asia-south1`.
 `gsutil cp sites_master.csv gs://advitia-weighbridge-data/dashboard_config/sites_master.csv`
 — visible within 30 min, or at once after a signed-in `POST /admin/refresh-cache`.
 
+## Admin login
+
+`ADMIN_USERNAME` / `ADMIN_PASSWORD_HASH` env vars (see `.env.example`). Without them the
+old hardcoded hash in `auth.py` is used — treat that as local-only. On Cloud Run pass the hash
+as a secret: `--set-secrets SECRET_KEY=dashboard-secret-key:latest,ADMIN_PASSWORD_HASH=dashboard-admin-hash:latest`.
+
+## Giving someone access
+
+Sign in with the env-var admin → **Admin** in the nav (`/admin`):
+- **Users**: username, password, access = "All sites + reports" or one site. Saved hashed to
+  `users.csv` in the data folder. Re-adding a username resets its password. Remove = revoke.
+- **Data files**: upload a new `sites_master.csv` (header validated first) or `users.csv`;
+  download the current copies. Upload clears the caches, so the dashboard updates at once.
+- Only the env-var admin sees `/admin`. `users.csv` users never can, so nobody you add can lock you out.
+
+## Data by ULB (public /ulb)
+
+Upload `sites_phases.csv` in Admin (header: location, site_name, phase, agency_name, cluster,
+target_mt, remediated_mt, rdf_disposed_mt, inert_disposed_mt, soil_disposed_mt, cnd_disposed_mt,
+start_date, deadline_date, status, link_to, notes). One row per (ULB, phase). "ULB" = site_name;
+location distinguishes entries (Kadiri1 / Kadiri2). Dates accept dd-mm-yyyy or yyyy-mm-dd.
+`link_to` (or site_name) matching `sites_master.csv` adds the open-site icon on the row.
+Phase tabs order themselves: "...current" first, then Phase 2, 1, "Phase 1 - 15% Excess", Old.
+
+## Access-request emails (Gmail SMTP)
+
+1. Gmail account with 2-step verification on → myaccount.google.com/apppasswords → create an
+   App Password (16 characters). Your normal Gmail password will NOT work.
+2. Set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER=you@gmail.com`,
+   `SMTP_PASSWORD=<app password>`, `ACCESS_REQUEST_TO=you@gmail.com` (see `.env.example`).
+3. On Cloud Run pass `SMTP_PASSWORD` as a secret, the rest as env vars.
+
+Without these, requests are still accepted and written to the app log (`Access request:` lines).
+
 ## Build steps
 
-1. Layout + four styles — done
-2. (nothing to delete in a fresh repo)
-3. Login page
-4. Overview
-5. Sites list
-6. Site detail
-7. Reports
+All screens built: layout + four styles, login, overview, sites list, site detail, reports.
 
 `data/site_daywise_pdf.py` is a stub; replace it with the real file from the old deployment.

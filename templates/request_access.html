@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Request access — Swachh Andhra{% endblock %}
+{% block content %}
+<div class="auth">
+  <aside class="auth-side">
+    <img src="{{ url_for('static', filename='img/left.png') }}" alt="" class="auth-emblem">
+    <h1>Request access</h1>
+    <p>Site pages and reports are restricted to officials and agency staff. Tell us who you are and which site you need; you'll hear back by email.</p>
+    <a class="auth-link" href="{{ url_for('login.login_view') }}"><i class="bi bi-arrow-left"></i> Already have a login</a>
+  </aside>
+  <div class="hcard auth-card">
+    {% if sent %}
+      <div class="auth-done">
+        <i class="bi bi-check-circle"></i>
+        <h2>Request received</h2>
+        <p class="text-secondary mb-0">The admin has been notified. Access details will be sent to your email once approved.</p>
+        <a class="btn btn-primary mt-3" href="{{ url_for('overview.overview') }}">Back to the dashboard</a>
+      </div>
+    {% else %}
+    {% if error %}<div class="alert alert-danger py-2 mb-0">{{ error }}</div>{% endif %}
+    <form method="post" class="auth-form" autocomplete="on">
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}">
+      <div class="two">
+        <label class="field">Full name<input class="form-control" name="name" value="{{ values.name }}" required autofocus></label>
+        <label class="field">Designation<input class="form-control" name="designation" value="{{ values.designation }}" placeholder="e.g. Site engineer, DPO" required></label>
+      </div>
+      <label class="field">Organisation<input class="form-control" name="organisation" value="{{ values.organisation }}" placeholder="Agency, ULB or department"></label>
+      <div class="two">
+        <label class="field">Email<input class="form-control" type="email" name="email" value="{{ values.email }}" required></label>
+        <label class="field">Phone<input class="form-control" type="tel" name="phone" value="{{ values.phone }}"></label>
+      </div>
+      <label class="field">Site of interest<input class="form-control" name="site" value="{{ values.site }}" placeholder="e.g. Kadapa, Kurnool, or all sites" required></label>
+      <label class="field">Why do you need access? <span class="text-tertiary fw-normal">(optional)</span><textarea class="form-control" name="reason" rows="2">{{ values.reason }}</textarea></label>
+      <label class="field">Security check · <strong>{{ captcha_question }} = ?</strong><input class="form-control" name="captcha_answer" inputmode="numeric" placeholder="Answer" required></label>
+      <button class="btn btn-primary btn-lg" type="submit">Send request</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

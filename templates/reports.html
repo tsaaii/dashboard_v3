@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Reports — Swachh Andhra{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Reports</h1><div class="sub">Every weighbridge record, across all sites</div></div></div>
+
+<section class="hcard mb-3">
+  <form id="report-form" class="d-flex flex-wrap gap-2 align-items-end" hx-get="{{ url_for('reports.rows') }}" hx-target="#rows" hx-trigger="submit, load" hx-indicator="#rows-busy">
+    <label class="field">Agency<select class="form-select" name="agency_name"><option value="">All</option>{% for a in o.agencies %}<option {{ 'selected' if a == f.agency_name }}>{{ a }}</option>{% endfor %}</select></label>
+    <label class="field">Site<select class="form-select" name="site_name"><option value="">All</option>{% for s in o.sites %}<option {{ 'selected' if s == f.site_name }}>{{ s }}</option>{% endfor %}</select></label>
+    <label class="field">Material<select class="form-select" name="material_type"><option value="">All</option>{% for m in o.materials %}<option {{ 'selected' if m == f.material_type }}>{{ m }}</option>{% endfor %}</select></label>
+    <label class="field">Transfer party<select class="form-select" name="transfer_party_name"><option value="">All</option>{% for p in o.transfer_parties %}<option {{ 'selected' if p == f.transfer_party_name }}>{{ p }}</option>{% endfor %}</select></label>
+    <label class="field">From<input class="form-control" type="date" name="start_date" value="{{ f.start_date }}"></label>
+    <label class="field">To<input class="form-control" type="date" name="end_date" value="{{ f.end_date }}"></label>
+    <label class="field">Vehicle<input class="form-control" name="vehicle_no" value="{{ f.vehicle_no }}" style="width:130px"></label>
+    <label class="field">Ticket<input class="form-control" name="ticket_no" value="{{ f.ticket_no }}" style="width:110px"></label>
+    <button class="btn btn-primary">Run</button>
+    <button class="btn btn-outline-secondary" type="button" onclick="location.href='{{ url_for('reports.export_pdf') }}?'+new URLSearchParams(new FormData(this.form))"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+    <span id="rows-busy" class="htmx-indicator text-secondary small">Loading…</span>
+  </form>
+</section>
+
+<section class="hcard p-0 overflow-hidden"><div id="rows" class="p-3"><p class="text-secondary small mb-0">Loading…</p></div></section>
+{% endblock %}

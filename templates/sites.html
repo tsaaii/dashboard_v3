@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Sites — Swachh Andhra{% endblock %}
+{% macro th(key, label, cls='') -%}
+  {%- set active = sort == key -%}
+  <th class="{{ cls }}"><a class="th-sort{{ ' is-active' if active }}" href="{{ url_for('sites.sites_list', phase=phase, agency=agency, q=q, sort=key, dir=('asc' if (active and desc) else 'desc' if active else 'asc')) }}">{{ label }}<i class="bi {{ 'bi-caret-up-fill' if active and not desc else 'bi-caret-down-fill' if active else 'bi-arrow-down-up' }}"></i></a></th>
+{%- endmacro %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Sites</h1><div class="sub">{{ totals.sites }} site{{ '' if totals.sites == 1 else 's' }} · {{ rows|length }} assignment{{ '' if rows|length == 1 else 's' }}{% if phase %} in {{ phase }}{% endif %} · open a site to sign in and see its records</div></div>
+  <form class="d-flex flex-wrap gap-2" method="get">
+    <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ 'desc' if desc else 'asc' }}">
+    <select class="form-select" style="width:auto" name="phase" onchange="this.form.submit()">
+      <option value="">Show all phases</option>
+      {% for p in phase_options %}<option {{ 'selected' if p == phase }}>{{ p }}</option>{% endfor %}
+    </select>
+    <select class="form-select" style="width:auto" name="agency" onchange="this.form.submit()"><option value="">All agencies</option>{% for a in agency_options %}<option {{ 'selected' if a == agency }}>{{ a }}</option>{% endfor %}</select>
+    <input class="form-control" style="width:200px" type="search" name="q" value="{{ q }}" placeholder="Search site or place">
+    <button class="btn btn-primary">Filter</button>
+  </form>
+</div>
+
+<section class="cards-4 mb-4">
+  <article class="hcard"><div class="hcard-head"><span class="hcard-title">Assigned</span></div><div><span class="stat">{{ totals.target|inr }}</span><span class="stat-unit">MT</span></div></article>
+  <article class="hcard"><div class="hcard-head"><span class="hcard-title">Remediated</span><span class="badge-soft">{{ (totals.done|share(totals.target))|pct }}</span></div><div><span class="stat">{{ totals.done|inr }}</span><span class="stat-unit">MT</span></div><div class="bar"><span style="width:{{ '%.1f'|format(totals.done|share(totals.target)) }}%"></span></div></article>
+  <article class="hcard"><div class="hcard-head"><span class="hcard-title">Disposed</span><span class="badge-soft neutral">{{ (totals.disposed|share(totals.done))|pct }} of remediated</span></div><div><span class="stat">{{ totals.disposed|inr }}</span><span class="stat-unit">MT</span></div>{% with split=totals.split, total=totals.disposed %}{% include "partials/split_bar.html" %}{% endwith %}</article>
+  <article class="hcard"><div class="hcard-head"><span class="hcard-title">Sites</span></div><div><span class="stat">{{ totals.sites }}</span><span class="stat-unit">{{ 'in ' ~ phase if phase else 'across all phases' }}</span></div></article>
+</section>
+
+<div class="hcard p-0 overflow-hidden">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0 sites-table">
+  <thead><tr>{{ th('site','Site') }}{{ th('phase','Phase') }}{{ th('agency','Agency') }}{{ th('target','Assigned MT','text-end') }}{{ th('remediated','Remediated MT','text-end') }}{{ th('progress','Progress') }}{{ th('disposed','Disposed MT','text-end') }}{{ th('deadline','Deadline') }}<th>Status</th></tr></thead>
+  {% for g in groups %}
+  <tbody class="site-group">
+  {% if sort == 'site' and g.rows|length > 1 %}<tr class="group-head"><td colspan="3"><i class="bi bi-geo-alt"></i> {{ g.location }} <span class="text-tertiary fw-normal">· {{ g.rows|length }} assignments</span></td><td class="text-end">{{ (g.rows|sum(attribute='target_mt'))|inr }}</td><td class="text-end">{{ (g.rows|sum(attribute='remediated_mt'))|inr }}</td><td></td><td class="text-end">{{ (g.rows|sum(attribute='disposed_mt'))|inr }}</td><td colspan="2"></td></tr>{% endif %}
+  {% for r in g.rows %}{% set p = r.pct %}{% set c = 'ok' if p >= 100 else 'info' if p >= 75 else 'warn' if p >= 50 else 'bad' %}
+  <tr class="{{ 'group-row' if sort == 'site' and g.rows|length > 1 }}">
+    <td>{% if r.slug %}<a class="fw-semibold" href="{{ url_for('sites.site_view', slug=r.slug) }}" title="Sign in to see this site's records">{{ r.site_name }} <i class="bi bi-lock-fill text-tertiary small"></i></a>{% else %}<span class="fw-semibold">{{ r.site_name }}</span>{% endif %}{% if r.notes %}<div class="text-tertiary small">{{ r.notes }}</div>{% endif %}</td>
+    <td><span class="badge-soft neutral">{{ r.phase }}</span></td>
+    <td class="text-secondary">{{ r.agency_name }}</td>
+    <td class="text-end">{{ r.target_mt|inr }}</td>
+    <td class="text-end">{{ r.remediated_mt|inr }}</td>
+    <td><div class="d-flex align-items-center gap-2"><span class="bar flex-grow-1"><span class="{{ c }}" style="width:{{ '%.1f'|format(p if p < 100 else 100) }}%"></span></span><span class="c-{{ c }} fw-semibold" style="width:56px;text-align:right">{{ p|pct }}</span></div></td>
+    <td class="text-end" title="Soil {{ r.soil_mt|inr }} · RDF {{ r.rdf_mt|inr }} · C&D {{ r.cnd_mt|inr }} · Inert {{ r.inert_mt|inr }}">{{ r.disposed_mt|inr }}{% if r.disposed_mt %}<div class="mini-split"><span class="bg-warn" style="width:{{ '%.0f'|format(r.soil_mt|share(r.disposed_mt)) }}%"></span><span class="bg-ok" style="width:{{ '%.0f'|format(r.rdf_mt|share(r.disposed_mt)) }}%"></span><span class="bg-info" style="width:{{ '%.0f'|format(r.cnd_mt|share(r.disposed_mt)) }}%"></span><span class="bg-muted" style="width:{{ '%.0f'|format(r.inert_mt|share(r.disposed_mt)) }}%"></span></div>{% endif %}</td>
+    <td class="text-secondary text-nowrap">{{ r.deadline_date or "—" }}</td>
+    <td>{% if r.status == 'completed' or p >= 100 %}<span class="badge-soft">Completed</span>{% elif r.remediated_mt > 0 or r.status == 'active' %}<span class="badge-soft warn">In progress</span>{% else %}<span class="badge-soft neutral">Not started</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  {% else %}<tbody><tr><td colspan="9" class="text-center text-secondary py-4">No sites match these filters.</td></tr></tbody>{% endfor %}
+  {% if rows %}<tfoot><tr class="fw-semibold"><td colspan="3">Total</td><td class="text-end">{{ totals.target|inr }}</td><td class="text-end">{{ totals.done|inr }}</td><td>{{ (totals.done|share(totals.target))|pct }}</td><td class="text-end">{{ totals.disposed|inr }}</td><td colspan="2"></td></tr></tfoot>{% endif %}
+</table>
+</div>
+</div>
+{% if not has_phase_file %}<p class="text-tertiary small mt-3 mb-0">Showing the current site list. Upload <code>sites_phases.csv</code> in Admin to show phase-wise assignments.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{#- Progress buckets. args: n_sites, b100, b75, b50, blow -#}
+<article class="hcard">
+  <div class="hcard-head">
+    <span class="hcard-title">Progress</span>
+    <span class="badge-soft neutral">{{ n_sites }} site{{ '' if n_sites == 1 else 's' }}</span>
+  </div>
+  <div class="buckets">
+    <div><div class="stat-sm c-ok">{{ b100 }}</div><div class="stat-label">100% complete</div></div>
+    <div><div class="stat-sm c-info">{{ b75 }}</div><div class="stat-label">75–99%</div></div>
+    <div><div class="stat-sm c-warn">{{ b50 }}</div><div class="stat-label">50–74%</div></div>
+    <div><div class="stat-sm c-bad">{{ blow }}</div><div class="stat-label">below 50%</div></div>
+  </div>
+</article>

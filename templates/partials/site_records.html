@@ -1,0 +1,22 @@
+{% if error %}<div class="alert alert-warning py-2">Weighbridge API unreachable: {{ error }}</div>{% endif %}
+<div class="d-flex flex-wrap gap-4 align-items-end mb-3">
+  <div><div class="stat-sm">{{ n|inr }}</div><div class="stat-label">trips</div></div>
+  <div><div class="stat-sm">{{ '%.1f'|format(summary.total_net_weight_mt) }}</div><div class="stat-label">MT net</div></div>
+  <div><div class="stat-sm">{{ summary.by_vehicle|length }}</div><div class="stat-label">vehicles</div></div>
+  <div class="ms-auto d-flex gap-2">
+    {% for row in summary.by_material[:4] %}<span class="badge-soft neutral">{{ row.material_type }} {{ '%.1f'|format(row.net_weight_mt) }} MT</span>{% endfor %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sites.site_report_pdf', slug=site.slug, start=start, end=end, material=material, vehicle=vehicle) }}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+  </div>
+</div>
+<div class="trend" title="MT per day">{% for d, v in days %}<span style="height:{{ '%.1f'|format([1.5, v / peak * 100]|max) }}%" class="{{ 'bg-muted' if v == 0 }}" title="{{ d }} · {{ '%.1f'|format(v) }} MT"></span>{% endfor %}</div>
+<div class="table-responsive">
+<table class="table table-sm table-hover align-middle mb-0">
+  <thead><tr><th>Date</th><th>Time</th><th>Ticket</th><th>Vehicle</th><th>Material</th><th>Transfer party</th><th class="text-end">First kg</th><th class="text-end">Second kg</th><th class="text-end">Net kg</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+  <tr><td>{{ r.date }}</td><td>{{ r.time[:5] }}</td><td>{{ r.ticket_no }}</td><td>{{ r.vehicle_no }}</td><td>{{ r.material_type }}</td><td class="text-secondary">{{ r.transfer_party_name or '—' }}</td><td class="text-end">{{ r.first_weight_kg|inr }}</td><td class="text-end">{{ r.second_weight_kg|inr }}</td><td class="text-end fw-semibold">{{ r.net_weight_kg|inr }}</td></tr>
+  {% else %}<tr><td colspan="9" class="text-center text-secondary py-4">No records for {{ start }} to {{ end }}.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% if n > records|length %}<p class="text-tertiary small mt-2 mb-0">Showing first {{ records|length }} of {{ n }} trips. Narrow the dates or use the PDF for the full list.</p>{% endif %}

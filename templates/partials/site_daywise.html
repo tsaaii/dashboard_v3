@@ -1,0 +1,13 @@
+{% if error %}<div class="alert alert-warning py-2">Weighbridge API unreachable: {{ error }}</div>{% endif %}
+{# refresh the party dropdown from what this range contains #}
+<select hx-swap-oob="true" class="form-select" name="party" id="party-select"><option value="">All</option>{% for p in parties %}<option {{ 'selected' if p == party }}>{{ p }}</option>{% endfor %}</select>
+<div class="d-flex justify-content-end mb-2"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sites.site_daywise_pdf_route', slug=site.slug, start=start, end=end, party=party) }}"><i class="bi bi-file-earmark-pdf"></i> PDF</a></div>
+{% for m in summary.materials %}
+<div class="mb-3">
+  <div class="d-flex justify-content-between align-items-baseline mb-1"><strong>{{ m.material_type }}</strong><span class="text-secondary small">{{ m.total.trips }} trips · {{ '%.3f'|format(m.total.net_mt) }} MT</span></div>
+  <div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>#</th><th>Date</th><th>First trip</th><th>Last trip</th><th class="text-end">Trips</th><th class="text-end">Net MT</th></tr></thead>
+    <tbody>{% for d in m.days %}<tr><td class="text-tertiary">{{ loop.index }}</td><td>{{ d.date }}</td><td>{{ d.start_time }}</td><td>{{ d.end_time }}</td><td class="text-end">{{ d.trips }}</td><td class="text-end fw-semibold">{{ '%.3f'|format(d.net_mt) }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% else %}<p class="text-secondary mb-0">No records for {{ start }} to {{ end }}.</p>{% endfor %}

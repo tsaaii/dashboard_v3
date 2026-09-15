@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Admin — Swachh Andhra{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Admin</h1><div class="sub">Data folder <code>{{ folder }}</code> · {{ n_sites }} sites loaded</div></div>
+  <form method="post" action="{{ url_for('admin.refresh_cache') }}"><button class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh cache</button></form>
+</div>
+
+{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="alert alert-{{ cat }} py-2">{{ m }}</div>{% endfor %}{% endwith %}
+
+<section class="hcard mb-4">
+  <div class="hcard-head"><span class="hcard-title">Data files</span><span class="text-tertiary small">upload replaces the file and refreshes the dashboard</span></div>
+  <div class="table-responsive"><table class="table align-middle mb-0">
+    <thead><tr><th>File</th><th>Current</th><th>Replace</th></tr></thead>
+    <tbody>
+    {% for f in files %}
+    <tr>
+      <td><strong>{{ f.label }}</strong><div class="text-tertiary small">{{ f.name }}</div></td>
+      <td>{% if f.exists %}{{ f.updated }} · {{ (f.size / 1024)|round(1) }} KB · <a href="{{ url_for('admin.download', name=f.name) }}">download</a>{% else %}<span class="text-secondary">not present</span>{% endif %}</td>
+      <td>
+        <form method="post" action="{{ url_for('admin.upload') }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
+          <input type="hidden" name="name" value="{{ f.name }}">
+          <input class="form-control form-control-sm" type="file" name="file" accept=".csv" required style="max-width:280px">
+          <button class="btn btn-sm btn-primary">Upload</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="text-tertiary small mb-0">The sites file must keep its header row. If a required column is missing the upload is rejected and nothing changes.</p>
+</section>
+
+<section class="hcard">
+  <div class="hcard-head"><span class="hcard-title">Users</span><span class="badge-soft neutral">{{ users|length }} in users.csv</span></div>
+  <form method="post" action="{{ url_for('admin.users_add') }}" class="d-flex flex-wrap gap-2 align-items-end" autocomplete="off">
+    <label class="field">Username<input class="form-control" name="username" required autocapitalize="none" style="width:150px"></label>
+    <label class="field">Password<input class="form-control" name="password" type="text" required style="width:170px"></label>
+    <label class="field">Access
+      <select class="form-select" name="scope">
+        <option value="all">All sites + reports</option>
+        {% for s in site_slugs %}<option value="{{ s }}">Site: {{ s }}</option>{% endfor %}
+      </select></label>
+    <label class="field">Name / note<input class="form-control" name="name" placeholder="Priya, SAC" style="width:200px"></label>
+    <button class="btn btn-primary">Add user</button>
+  </form>
+  <p class="text-tertiary small mb-0">Passwords are stored hashed; you can't read them back, only reset by adding the same username again. Your own admin login comes from the environment and never appears here.</p>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead><tr><th>Username</th><th>Access</th><th>Name</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr><td><strong>{{ u.username }}</strong></td><td>{% if u.scope == 'all' %}<span class="badge-soft">All sites + reports</span>{% else %}<span class="badge-soft neutral">Site: {{ u.scope }}</span>{% endif %}</td><td class="text-secondary">{{ u.name }}</td><td class="text-secondary">{{ u.created }}</td>
+      <td class="text-end"><form method="post" action="{{ url_for('admin.users_remove') }}" onsubmit="return confirm('Remove {{ u.username }}?')"><input type="hidden" name="username" value="{{ u.username }}"><button class="btn btn-sm btn-outline-secondary">Remove</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="text-secondary text-center py-3">No users yet. Add one above — the file is created on first save.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

@@ -1,0 +1,8 @@
+location,site_name,phase,agency_name,cluster,target_mt,remediated_mt,soil_disposed_mt,rdf_disposed_mt,cnd_disposed_mt,inert_disposed_mt,start_date,deadline_date,status,link_to,notes
+Kadiri,Kadiri,Previous,Zigma Global,Kadiri,80000,80000,30000,4000,2000,6000,2023-06-01,2024-12-31,completed,,Old balance work
+Kadiri,Tharuni Kadiri,Phase4,Tharuni Associates,Phase4,11679.27,11014,59.59,6.24,3.12,8.58,2025-03-30,2026-09-30,active,Tharuni_Kadiri,
+Kadiri,Kadiri2,Phase4,Tharuni Associates,Phase4,100666,67800,0,0,0,0,2025-03-30,2026-09-30,active,Tharuni_Kadiri2,Extension with new quantity
+Ananthapur,Ananthapur,Phase1,Tharuni Associates,Ananthapur,120000,120000,45000,6000,3000,9000,2024-01-15,2025-03-31,completed,,
+Ananthapur,Ananthapur,Phase4,Tharuni Associates,Ananthapur,210196,32425,269.92,22.14,0,62.29,2025-03-30,2026-09-30,active,,
+Kurnool,Kurnool,Phase1,Saurashtra Enviro,Phase1,314825,314076.21,120000,15000,5000,20000,2023-06-01,2024-12-31,completed,,
+Kurnool,Kurnool,Phase4,Saurashtra Enviro,Phase4,368318.4,322956,123400,29100,6500,17800,2025-03-30,2026-09-30,active,,
