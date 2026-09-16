@@ -1,0 +1,59 @@
+{# Printable ticket sheet. Deliberately NOT themed: this is the on-screen twin
+   of enhanced_pdf_creator.py's output (T28334.pdf) — black on white, centred
+   headings, ruled tables — so what you print matches the PDF you already
+   circulate. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Ticket No: {{ ticket }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ticket.css') }}">
+</head>
+<body>
+<button class="tk-print" onclick="window.print()">Print</button>
+
+<div class="tk-page">
+  <header class="tk-head">
+    <h1>{{ record.agency_name or agency or '—' }}</h1>
+    {% if address %}<p class="tk-addr">{{ address }}</p>{% endif %}
+  </header>
+
+  <p class="tk-printed">Print Date: {{ printed }}</p>
+  <h2 class="tk-ticket">Ticket No: {{ ticket }}</h2>
+
+  <h3 class="tk-section">VEHICLE INFORMATION</h3>
+  <table class="tk-info">
+    <tr><th>Vehicle No:</th><td>{{ record.vehicle_no or '' }}</td>
+        <th>Date:</th><td>{{ record.date or date }}</td>
+        <th>Time:</th><td>{{ record.time or '' }}</td></tr>
+    <tr><th>Material:</th><td>{{ record.material or record.material_type or '' }}</td>
+        <th>Site Name:</th><td>{{ record.site_name or site }}</td>
+        <th>Transfer Party:</th><td>{{ record.transfer_party_name or '' }}</td></tr>
+    <tr><th>Agency Name:</th><td>{{ record.agency_name or '' }}</td>
+        <th>User Name:</th><td>{{ record.user_name or '' }}</td>
+        <th>Site Incharge:</th><td>{{ record.site_incharge or '' }}</td></tr>
+  </table>
+
+  <h3 class="tk-section">WEIGHMENT DETAILS</h3>
+  <table class="tk-weigh">
+    <tr><td>First Weight:</td><td>{{ first_w }}</td><td>First Time:</td><td>{{ record.first_timestamp or 'Not captured' }}</td></tr>
+    <tr><td>Second Weight:</td><td>{{ second_w }}</td><td>Second Time:</td><td>{{ record.second_timestamp or 'Not captured' }}</td></tr>
+    <tr><td></td><td></td><td class="tk-b">Net Weight:</td><td class="tk-b">{{ net }}</td></tr>
+  </table>
+
+  <h3 class="tk-section">VEHICLE IMAGES (4-Image System)</h3>
+  {# Slot order is views/record_images.SLOTS. The proxy 404s on an uncaptured
+     slot, so onerror covers every combination of present and missing. #}
+  <table class="tk-imgs">
+    <tr>{% for t in tiles[:2] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
+    <tr>{% for t in tiles[:2] %}<td><img src="{{ t.url }}" alt="{{ t.caption }}"
+        onerror="this.parentNode.innerHTML='<div class=&quot;tk-missing&quot;>Image not available</div>'"></td>{% endfor %}</tr>
+    <tr>{% for t in tiles[2:] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
+    <tr>{% for t in tiles[2:] %}<td><img src="{{ t.url }}" alt="{{ t.caption }}"
+        onerror="this.parentNode.innerHTML='<div class=&quot;tk-missing&quot;>Image not available</div>'"></td>{% endfor %}</tr>
+  </table>
+</div>
+</body>
+</html>

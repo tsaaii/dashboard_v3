@@ -59,6 +59,7 @@ class Site:
     land_reclaimed_acres: float = 0.0
     # Per-site login (used only by the /sites/<slug> gate). Plaintext for the
     # MVP; swap to hashes later without touching the route logic.
+    address: str = ""          # optional; printed on the ticket sheet letterhead
     login_id: str = ""
     login_pwd: str = ""
 
@@ -157,6 +158,7 @@ def _row_to_site(row: dict) -> Optional[Site]:
         inert_disposed_mt=_parse_float(row.get("inert_disposed_mt", "0")),
         land_total_acres=_parse_float(row.get("land_total_acres", "0")),
         land_reclaimed_acres=_parse_float(row.get("land_reclaimed_acres", "0")),
+        address=(row.get("address") or "").strip(),
         login_id=(row.get("login_id") or "").strip(),
         login_pwd=(row.get("login_pwd") or ""),   # do NOT strip — preserve as-is
     )

@@ -29,6 +29,7 @@ import config
 from data.aggregate import fmt_int_indian, fmt_k, fmt_pct
 from views.admin import bp as admin_bp
 from views.login import bp as login_bp, is_admin, login_required
+from views.record_images import bp as record_images_bp
 from views.overview import bp as overview_bp
 from views.reports import bp as reports_bp
 from views.sites import bp as sites_bp
@@ -74,6 +75,19 @@ def create_app() -> Flask:
     app.add_template_filter(fmt_int_indian, "inr")
     app.add_template_filter(fmt_pct, "pct")
     app.add_template_filter(fmt_k, "k")
+    def _without(args: dict, key: str, value: str | None = None) -> dict:
+        """Copy of request.args minus one key, or minus one value of a repeated
+        key — used by the 'remove this filter' chips."""
+        out = {k: list(v) for k, v in args.items()}
+        if value is None:
+            out.pop(key, None)
+        elif key in out:
+            out[key] = [x for x in out[key] if x != value]
+            if not out[key]:
+                out.pop(key)
+        return out
+
+    app.add_template_filter(_without, "without")
     app.add_template_filter(lambda a, b: min(100.0, max(0.0, (a / b * 100) if b else 0.0)), "share")
 
     app.register_blueprint(overview_bp)
@@ -82,6 +96,7 @@ def create_app() -> Flask:
     app.register_blueprint(ulb_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(record_images_bp)
 
     @app.route("/style/<name>")
     def set_style(name):

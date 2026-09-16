@@ -1,23 +1,62 @@
-{% if meta.error %}<div class="alert alert-warning py-2">Weighbridge API: {{ meta.error }}</div>{% endif %}
-<div class="d-flex justify-content-between align-items-center mb-2 small text-secondary">
-  <span><strong class="text-body">{{ total|inr }}</strong> records · page {{ page }} of {{ pages }}</span>
-  <span class="text-tertiary">{{ meta.took_ms }} ms{{ ' · cached' if meta.cached }}</span>
+{# One page of records. Sorting and paging re-request this fragment with the
+   whole filter form included, so no state lives in JavaScript. #}
+{% macro th(key, label) -%}
+  {%- set active = sort == key -%}
+  <th class="{{ 'num' if schema[key].numeric }}">
+    <button class="th-sort{{ ' is-active' if active }}" type="button"
+            hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-target="#rows"
+            hx-vals='{"sort": "{{ key }}", "dir": "{{ 'asc' if active and desc else 'desc' if active else 'asc' }}", "page": {{ page }}}'>
+      {{ label }}<i class="bi {{ 'bi-caret-up-fill' if active and not desc else 'bi-caret-down-fill' if active else 'bi-arrow-down-up' }}"></i>
+    </button>
+  </th>
+{%- endmacro %}
+
+{% if meta.error %}<div class="alert alert-warning py-2 m-3">Weighbridge API: {{ meta.error }}</div>{% endif %}
+
+<div class="rp-bar">
+  <span>{% if total %}<strong>{{ first|inr }}–{{ last|inr }}</strong> of <strong>{{ total|inr }}</strong> records{% else %}No records{% endif %}</span>
+  <span class="rp-sum">Σ net <strong>{{ '%.2f'|format(summary.net_mt) }} MT</strong> on this page · {{ summary.vehicles }} vehicles · {{ summary.sites }} sites</span>
+  {% if dropped %}<span class="rp-dropped" title="Net weight of 0, or not a multiple of 5 kg">{{ dropped }} bad-weight row{{ '' if dropped == 1 else 's' }} hidden</span>{% endif %}
+  <span class="ms-auto text-tertiary">{{ meta.took_ms }} ms{{ ' · cached' if meta.cached }}</span>
 </div>
+
 <div class="table-responsive">
-<table class="table table-sm table-hover align-middle mb-0">
-  <thead><tr><th>Date</th><th>Time</th><th>Ticket</th><th>Site</th><th>Agency</th><th>Vehicle</th><th>Material</th><th>Transfer party</th><th class="text-end">Net kg</th></tr></thead>
+<table class="table table-sm table-hover align-middle mb-0 rp-table">
+  <thead><tr>{% for c in cols %}{{ th(c, schema[c].label) }}{% endfor %}<th class="rp-imgh">Photos</th></tr></thead>
   <tbody>
   {% for r in records %}
-  <tr><td>{{ r.date }}</td><td>{{ (r.time or '')[:5] }}</td><td>{{ r.ticket_no }}</td><td>{{ r.site_name }}</td><td class="text-secondary">{{ r.agency_name }}</td><td>{{ r.vehicle_no }}</td><td>{{ r.material_type or r.material }}</td><td class="text-secondary">{{ r.transfer_party_name or '—' }}</td><td class="text-end fw-semibold">{{ r.net_weight|inr }}</td></tr>
-  {% else %}<tr><td colspan="9" class="text-center text-secondary py-4">No records match.</td></tr>{% endfor %}
+  <tr>
+    {% for c in cols %}<td class="{{ 'num' if schema[c].numeric }}">{% set v = r.get(c) %}{% if v in (none, '') %}<span class="text-tertiary">—</span>{% elif schema[c].numeric %}{{ v|inr }}{% else %}{{ v }}{% endif %}</td>{% endfor %}
+    {# image_slots comes from records_api._image_slots: empty means this
+       ticket has no captures, so show a dash rather than an icon that opens
+       four "no image" panels. #}
+    {% set slots = r.image_slots or [] %}
+    <td class="rp-imgs">{% if slots %}
+      <a class="rp-photo" target="_blank" rel="noopener"
+         href="{{ url_for('record_images.sheet_view', site=r.site_name, date=r.date, ticket=r.ticket_no) }}"
+         title="View {{ slots|length }} weighbridge image{{ '' if slots|length == 1 else 's' }}">
+        <i class="bi bi-camera-fill"></i>
+      </a>{% else %}<span class="text-tertiary" title="No images for this ticket">—</span>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="{{ cols|length + 1 }}" class="text-center text-secondary py-5">
+    <div class="fs-5 fw-semibold mb-1">No records found</div>
+    <div>This filter combination returned nothing. Widen the date range or clear a filter.</div>
+  </td></tr>
+  {% endfor %}
   </tbody>
 </table>
 </div>
+
 {% if pages > 1 %}
-<div class="d-flex justify-content-between align-items-center mt-3">
-  {# these buttons re-use the form's filters and just change the page #}
-  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page <= 1 }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-vals='{"page": {{ page - 1 }}}' hx-target="#rows">← Previous</button>
-  <span class="small text-secondary">Page {{ page }} / {{ pages }}</span>
-  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page >= pages }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-vals='{"page": {{ page + 1 }}}' hx-target="#rows">Next →</button>
+<div class="rp-pager">
+  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page <= 1 }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-target="#rows" hx-vals='{"page": {{ page - 1 }}, "sort": "{{ sort }}", "dir": "{{ 'desc' if desc else 'asc' }}"}'><i class="bi bi-chevron-left"></i> Previous</button>
+  <span>Page <strong>{{ page }}</strong> of {{ pages }}</span>
+  <button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if page >= pages }} hx-get="{{ url_for('reports.rows') }}" hx-include="#report-form" hx-target="#rows" hx-vals='{"page": {{ page + 1 }}, "sort": "{{ sort }}", "dir": "{{ 'desc' if desc else 'asc' }}"}'>Next <i class="bi bi-chevron-right"></i></button>
 </div>
 {% endif %}
+
+<details class="rp-debug">
+  <summary><span class="rp-dot {{ 'bad' if meta.error }}"></span>Last API call<span class="ms-auto text-tertiary">{{ meta.upstream_ms }} ms upstream{{ ' · served from cache' if meta.cached }}</span></summary>
+  <code>{{ meta.upstream_url }}</code>
+</details>

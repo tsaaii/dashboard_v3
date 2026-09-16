@@ -132,7 +132,7 @@ def _groups(rows: list[dict], all_rows: list[dict], st: dict) -> list[dict]:
         for ph in sorted({r["phase"] for r in rows}, key=phase_rank):
             rs = [r for r in rows if r["phase"] == ph]
             items = [_row(r, all_rows, r["site_name"], _sub(r)) for r in rs]
-            groups.append({**agg(rs), "name": ph, "meta": f"{len(by_ulb(rs))} ULBs · {len({r['agency_name'] for r in rs})} agencies",
+            groups.append({**agg(rs), "name": ph, "meta": f"{len(by_ulb(rs))} ULBs · {len({r['agency_name'] for r in rs})} Agencies",
                            "count": len(by_ulb(rs)), "sections": [{"header": None, "rows": items}]})
     elif g == "site":
         for name, rs in by_ulb(rows).items():
@@ -145,7 +145,7 @@ def _groups(rows: list[dict], all_rows: list[dict], st: dict) -> list[dict]:
             sections = []
             for name, urs in by_ulb(rs).items():
                 items = [_row(r, all_rows, r["phase"], _sub(r)) for r in sorted(urs, key=lambda r: phase_rank(r["phase"]))]
-                sections.append({"header": {**agg(urs), "name": name, "meta": f"{len(urs)} phase{'s' if len(urs) != 1 else ''}", "count": len(urs)}, "rows": items})
+                sections.append({"header": {**agg(urs), "name": name, "meta": f"{len(urs)} Phase{'s' if len(urs) != 1 else ''}", "count": len(urs)}, "rows": items})
             groups.append({**agg(rs), "name": ag, "meta": f"{len(by_ulb(rs))} ULBs", "count": len(by_ulb(rs)), "sections": sections})
 
     # ---- sorting applies to groups, sections and rows alike ----

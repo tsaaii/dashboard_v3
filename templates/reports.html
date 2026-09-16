@@ -1,23 +1,150 @@
 {% extends "base.html" %}
-{% block title %}Reports — Swachh Andhra{% endblock %}
+{% block title %}Records Explorer — Swachh Andhra{% endblock %}
+
+{# Every control is inside #report-form; HTMX re-submits it on change and
+   swaps only the table. hx-push-url keeps the query string shareable. #}
 {% block content %}
-<div class="page-head"><div><h1>Reports</h1><div class="sub">Every weighbridge record, across all sites</div></div></div>
+<div class="page-head">
+  <div><h1>Records Explorer</h1><div class="sub">Filter, browse and export weighbridge records</div></div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('report-form').reset()">Reset</button>
+    <a class="btn btn-primary" href="{{ url_for('reports.export_pdf', **request.args.to_dict(flat=False)) }}"><i class="bi bi-file-earmark-pdf"></i> Export PDF</a>
+  </div>
+</div>
 
-<section class="hcard mb-3">
-  <form id="report-form" class="d-flex flex-wrap gap-2 align-items-end" hx-get="{{ url_for('reports.rows') }}" hx-target="#rows" hx-trigger="submit, load" hx-indicator="#rows-busy">
-    <label class="field">Agency<select class="form-select" name="agency_name"><option value="">All</option>{% for a in o.agencies %}<option {{ 'selected' if a == f.agency_name }}>{{ a }}</option>{% endfor %}</select></label>
-    <label class="field">Site<select class="form-select" name="site_name"><option value="">All</option>{% for s in o.sites %}<option {{ 'selected' if s == f.site_name }}>{{ s }}</option>{% endfor %}</select></label>
-    <label class="field">Material<select class="form-select" name="material_type"><option value="">All</option>{% for m in o.materials %}<option {{ 'selected' if m == f.material_type }}>{{ m }}</option>{% endfor %}</select></label>
-    <label class="field">Transfer party<select class="form-select" name="transfer_party_name"><option value="">All</option>{% for p in o.transfer_parties %}<option {{ 'selected' if p == f.transfer_party_name }}>{{ p }}</option>{% endfor %}</select></label>
-    <label class="field">From<input class="form-control" type="date" name="start_date" value="{{ f.start_date }}"></label>
-    <label class="field">To<input class="form-control" type="date" name="end_date" value="{{ f.end_date }}"></label>
-    <label class="field">Vehicle<input class="form-control" name="vehicle_no" value="{{ f.vehicle_no }}" style="width:130px"></label>
-    <label class="field">Ticket<input class="form-control" name="ticket_no" value="{{ f.ticket_no }}" style="width:110px"></label>
-    <button class="btn btn-primary">Run</button>
-    <button class="btn btn-outline-secondary" type="button" onclick="location.href='{{ url_for('reports.export_pdf') }}?'+new URLSearchParams(new FormData(this.form))"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
-    <span id="rows-busy" class="htmx-indicator text-secondary small">Loading…</span>
-  </form>
+{# A plain GET form: any change reloads the page, so the cross-filtered
+   dropdowns and the phase tiles are re-rendered server-side. HTMX is used
+   only to pull the first page of rows (and later pages / sorting). #}
+<form id="report-form" class="hcard rp-filters" method="get" action="{{ url_for('reports.reports_view') }}"
+      hx-get="{{ url_for('reports.rows') }}" hx-target="#rows" hx-indicator="#busy"
+      hx-trigger="load" hx-push-url="false" autocomplete="off">
+
+  {# ---- row 1: dates ---- #}
+  <div class="rp-row">
+    <div class="field"><span>Date range</span>
+      <div class="u-tabs rp-chips">
+        {% for key, label in [('24h','Last 24h'), ('7d','7 days'), ('30d','30 days'), ('all','All')] %}
+          <label class="{{ 'is-active' if preset == key }}"><input type="radio" name="preset" value="{{ key }}" {{ 'checked' if preset == key }} hidden>{{ label }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    <label class="field">From<input class="form-control" type="date" name="start_date" value="{{ f.start_date }}" onchange="clearPreset()"></label>
+    <label class="field">To<input class="form-control" type="date" name="end_date" value="{{ f.end_date }}" onchange="clearPreset()"></label>
+    <div class="ms-auto d-flex align-items-end gap-2">
+      <label class="field">Rows<select class="form-select" name="limit">{% for n in page_sizes %}<option {{ 'selected' if n == limit }}>{{ n }}</option>{% endfor %}</select></label>
+    </div>
+  </div>
+
+  {# ---- row 2: the common filters ---- #}
+  <div class="rp-row rp-grid">
+{# Agency / Site / Cluster are cross-filtered from sites_phases.csv — each
+   list is narrowed by the other two selections. #}
+{% set ags = po.agencies if po else o.agencies %}{% set sts = po.sites if po else o.sites %}{% set cls = po.clusters if po else o.clusters %}
+    <label class="field">Agency<select class="form-select" name="agency_name"><option value="">All agencies ({{ ags|length }})</option>{% for v in ags %}<option {{ 'selected' if v == f.agency_name }}>{{ v }}</option>{% endfor %}{% if f.agency_name and f.agency_name not in ags %}<option selected>{{ f.agency_name }}</option>{% endif %}</select></label>
+    <label class="field">Site<select class="form-select" name="site_name"><option value="">All sites ({{ sts|length }})</option>{% for v in sts %}<option {{ 'selected' if v == f.site_name }}>{{ v }}</option>{% endfor %}{% if f.site_name and f.site_name not in sts %}<option selected>{{ f.site_name }}</option>{% endif %}</select></label>
+    <label class="field">Cluster<select class="form-select" name="cluster"><option value="">All clusters ({{ cls|length }})</option>{% for v in cls %}<option {{ 'selected' if v == f.cluster }}>{{ v }}</option>{% endfor %}{% if f.cluster and f.cluster not in cls %}<option selected>{{ f.cluster }}</option>{% endif %}</select></label>
+    <label class="field">Material<select class="form-select" name="material"><option value="">All materials</option>{% for v in o.materials %}<option {{ 'selected' if v == f.material }}>{{ v }}</option>{% endfor %}</select></label>
+    <label class="field">Vehicle no<input class="form-control rp-text" name="vehicle_no" value="{{ f.vehicle_no }}" placeholder="AP39UX6276" spellcheck="false" autocapitalize="characters"></label>
+    <label class="field">Ticket no<input class="form-control rp-text" name="ticket_no" value="{{ f.ticket_no }}" placeholder="T0682" spellcheck="false"></label>
+  </div>
+
+  {# ---- active filters: one click to remove each ---- #}
+  {% if active or ph or preset == 'all' %}
+  <div class="rp-active">
+    <span class="hcard-title">Active</span>
+    {% for k, v in active %}
+      <a class="rp-chip" href="{{ url_for('reports.reports_view', **(request.args.to_dict(flat=False) | without(k))) }}" title="Remove this filter">{{ v }} <i class="bi bi-x-lg"></i></a>
+    {% endfor %}
+    {% for p in ph %}
+      <a class="rp-chip" href="{{ url_for('reports.reports_view', **(request.args.to_dict(flat=False) | without('ph', p))) }}" title="Remove this phase">{{ p }} <i class="bi bi-x-lg"></i></a>
+    {% endfor %}
+    <a class="rp-chip rp-chip-all" href="{{ url_for('reports.reports_view', start_date=f.start_date, end_date=f.end_date) }}">Clear all</a>
+  </div>
+  {% endif %}
+
+  {# ---- row 3: advanced ---- #}
+  <details class="rp-adv" {{ 'open' if advanced }}>
+    <summary><i class="bi bi-chevron-right u-chev"></i> Advanced filters</summary>
+    <div class="rp-row rp-grid mt-3">
+      <label class="field">Transfer party<select class="form-select" name="transfer_party_name"><option value="">All parties</option>{% for v in o.transfer_parties %}<option {{ 'selected' if v == f.transfer_party_name }}>{{ v }}</option>{% endfor %}</select></label>
+      <label class="field">Site incharge<select class="form-select" name="site_incharge"><option value="">All</option>{% for v in o.site_incharges %}<option {{ 'selected' if v == f.site_incharge }}>{{ v }}</option>{% endfor %}</select></label>
+      <label class="field">User<select class="form-select" name="user_name"><option value="">All</option>{% for v in o.users %}<option {{ 'selected' if v == f.user_name }}>{{ v }}</option>{% endfor %}</select></label>
+      <label class="field">Status<select class="form-select" name="record_status"><option value="">All</option>{% for v in ['complete', 'incomplete'] %}<option {{ 'selected' if v == f.record_status }}>{{ v }}</option>{% endfor %}</select></label>
+      <label class="field">Min net wt (kg)<input class="form-control rp-text" type="number" name="min_net_weight" value="{{ f.min_net_weight }}" placeholder="{{ o.weight_min or 0 }}"></label>
+      <label class="field">Max net wt (kg)<input class="form-control rp-text" type="number" name="max_net_weight" value="{{ f.max_net_weight }}" placeholder="{{ o.weight_max or '' }}"></label>
+    </div>
+  </details>
+</form>
+
+{% if panel %}
+<section class="hcard rp-panel">
+  <div class="hcard-head">
+    <span class="hcard-title">Phase progress · from sites_phases.csv</span>
+    <span class="text-tertiary small">{% if panel.scope %}{{ panel.scope|join(' · ') }} — {% endif %}{{ panel.ulbs }} ULB{{ '' if panel.ulbs == 1 else 's' }} · {{ panel.entries }} entr{{ 'y' if panel.entries == 1 else 'ies' }}</span>
+  </div>
+  <div class="u-tabs rp-chips">
+    <label class="{{ 'is-active' if not panel.selected }}" onclick="var f=document.getElementById('report-form');f.querySelectorAll('input[name=ph]').forEach(function(c){c.checked=false});f.submit();">All phases</label>
+    {% for p in panel.phases %}
+      <label class="{{ 'is-active' if p in panel.selected }}"><input form="report-form" type="checkbox" name="ph" value="{{ p }}" {{ 'checked' if p in panel.selected }} hidden>{{ p }}</label>
+    {% endfor %}
+  </div>
+  <div class="cards-4">
+    <article class="hcard">
+      <div class="hcard-head"><span class="hcard-title">Awarded</span></div>
+      <div><span class="stat">{{ panel.awarded|inr }}</span><span class="stat-unit">MT</span></div>
+      <div class="stat-foot">{{ panel.entries }} phase entr{{ 'y' if panel.entries == 1 else 'ies' }}</div>
+    </article>
+    <article class="hcard">
+      <div class="hcard-head"><span class="hcard-title">Remediated</span><span class="badge-soft">{{ panel.pct|pct }}</span></div>
+      <div><span class="stat">{{ panel.remediated|inr }}</span><span class="stat-unit">MT</span></div>
+      <div class="bar"><span style="width:{{ '%.1f'|format(panel.pct) }}%"></span></div>
+      <div class="stat-foot"><strong>{{ panel.remaining|inr }} MT</strong> remaining</div>
+    </article>
+    <article class="hcard">
+      <div class="hcard-head"><span class="hcard-title">Remediated on {{ panel.day }}</span><span class="badge-soft neutral">Legacy/MSW</span></div>
+      <div><span class="stat">{{ '%.2f'|format(panel.day_mt) }}</span><span class="stat-unit">MT</span></div>
+      <div class="stat-foot">{% if panel.day_err %}<span class="c-bad">API: {{ panel.day_err }}</span>{% else %}{{ panel.day_trips|inr }} valid trips{% endif %}</div>
+    </article>
+    <article class="hcard">
+      <div class="hcard-head"><span class="hcard-title">Days needed at this pace</span><span class="badge-soft {{ '' if panel.on_track else 'bad' }}">{{ panel.days_left }} left</span></div>
+      <div><span class="stat">{% if panel.days_needed is none %}—{% else %}{{ panel.days_needed|round(0, 'ceil')|int }}{% endif %}</span><span class="stat-unit">days</span></div>
+      <div class="stat-foot">{% if panel.days_needed is none %}no Legacy/MSW recorded on {{ panel.day }}{% else %}{{ panel.remaining|inr }} MT ÷ {{ '%.2f'|format(panel.day_mt) }} MT/day · deadline {{ panel.deadline }}{% endif %}</div>
+    </article>
+  </div>
 </section>
+{% endif %}
 
-<section class="hcard p-0 overflow-hidden"><div id="rows" class="p-3"><p class="text-secondary small mb-0">Loading…</p></div></section>
+<div class="rp-tablebar">
+  <span class="hcard-title">Records</span>
+  <details class="rp-cols ms-auto"><summary class="btn btn-sm btn-outline-secondary">Columns <i class="bi bi-chevron-down"></i></summary>
+    <div class="rp-cols-panel">
+      {% for key, meta in schema.items() %}
+      <label><input form="report-form" type="checkbox" name="cols" value="{{ key }}" {{ 'checked' if key in cols }}> {{ meta.label }}</label>
+      {% endfor %}
+    </div>
+  </details>
+</div>
+
+<div class="hcard p-0 overflow-hidden rp-results">
+  <div id="rows"><div class="p-4 text-secondary">Loading records…</div></div>
+</div>
+<div id="busy" class="htmx-indicator rp-busy"><span></span></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Any select/checkbox change re-submits the form, so the server can narrow
+  // the Agency / Site / Cluster lists against each other and recompute the
+  // phase tiles. Text boxes wait for Enter or the Apply button.
+  (function () {
+    var form = document.getElementById('report-form');
+    window.clearPreset = function () {
+      form.querySelectorAll('input[name=preset]').forEach(function (r) { r.checked = false; });
+    };
+    form.addEventListener('change', function (e) {
+      if (e.target.matches('input[type=text], input[type=search], input[type=number]')) return;
+      form.submit();
+    });
+  })();
+</script>
 {% endblock %}

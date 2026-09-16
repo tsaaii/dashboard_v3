@@ -33,6 +33,11 @@ def _invalidate_all() -> None:
     master.invalidate_cache()
     users.invalidate()
     phases.invalidate()
+    try:
+        from views import record_images
+        record_images.invalidate_cache()
+    except Exception:                        # noqa: BLE001
+        pass
     try:                                     # per-site totals cache, if present
         from data import site_totals
         site_totals.invalidate_cache()       # type: ignore[attr-defined]

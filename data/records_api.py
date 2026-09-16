@@ -55,9 +55,15 @@ EXPORT_HARD_CAP = 5000  # PDF export will refuse more than this many rows
 # to the browser. Cuts ~12 KB / page off the JSON payload.
 _STRIP_FIELDS: set[str] = {
     "_source_file", "_processed_timestamp", "_folder_source",
-    "first_front_image", "first_back_image",
-    "second_front_image", "second_back_image",
+    # The upstream images{} dict holds a ~60-char URL per slot, present even
+    # when empty: 4 x 50 rows is ~12 KB of redundancy per page. We keep only
+    # the slot NAMES (image_slots) — the proxy URL is fully determined by
+    # (site_name, date, ticket_no, slot).
+    "images",
 }
+
+# The four weighbridge captures, in 2x2 reading order.
+IMAGE_SLOTS: tuple[str, ...] = ("first_front", "first_back", "second_front", "second_back")
 
 
 # ---------------------------------------------------------------------------
@@ -108,10 +114,22 @@ def _cache_has(cache: TTLCache, key: str) -> bool:
         return bool(entry and entry[0] > time.time())
 
 
+def _image_slots(record: dict) -> list[str]:
+    """Slots this record actually has. An empty string upstream means the slot
+    was never captured, so this list is also what decides whether the table
+    shows a camera icon at all."""
+    raw = record.get("images")
+    if not isinstance(raw, dict):
+        return []
+    return [s for s in IMAGE_SLOTS if (raw.get(s) or "").strip()]
+
+
 def _strip_record(record: dict) -> dict:
-    """Drop noisy / unused fields from a single record."""
-    return {k: v for k, v in record.items()
-            if k not in _STRIP_FIELDS and not k.startswith("_")}
+    """Drop noisy fields from one record and attach image_slots."""
+    out = {k: v for k, v in record.items()
+           if k not in _STRIP_FIELDS and not k.startswith("_")}
+    out["image_slots"] = _image_slots(record)
+    return out
 
 
 def _do_fetch_records(params: dict) -> dict:

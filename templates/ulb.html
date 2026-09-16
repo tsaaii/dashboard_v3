@@ -10,9 +10,9 @@
 {% macro line(a, name, meta, sub='') -%}
   <span class="u-name"><span class="u-title">{{ name }}</span>{% if sub %}<span class="u-sub">{{ sub }}</span>{% endif %}</span>
   <span class="u-meta">{{ meta }}</span>
-  <span class="u-num">{{ a.target|inr }}</span>
-  <span class="u-num">{{ a.rem|inr }}</span>
-  <span class="u-num u-pctv {{ pctcls(a.pct) }}">{{ a.pct|pct }}</span>
+  <span class="u-num">{{ a.target|inr }} <span class="text-tertiary">MT</span></span>
+  <span class="u-num">{{ a.rem|inr }} <span class="text-tertiary">MT</span></span>
+  <span class="u-pctv {{ pctcls(a.pct) }}">{{ a.pct|pct }}</span>
   <span class="u-disp"><span>{{ a.disp|inr }} <span class="text-tertiary">MT</span></span><strong class="{{ pctcls(a.disp_pct) }}">{{ '%.0f'|format(a.disp_pct) }}%</strong>{% if a.over %}<span class="badge-soft bad">over</span>{% endif %}</span>
 {%- endmacro %}
 
@@ -42,22 +42,24 @@
       <a href="{{ link(phases=(st.phases|reject('equalto', p)|list) if on else st.phases + [p], roll='') }}" class="{{ 'is-active' if on }}"><i class="bi {{ 'bi-check-square-fill' if on else 'bi-square' }}"></i> {{ p }}</a>
     {% endfor %}
   </div>
-  <span class="text-tertiary small">tick more than one to combine phases</span>
+  <span class="text-tertiary small">check more than one to combine phases</span>
 </div>
 
 {# ---- KPIs ---- #}
 <section class="cards-4">
   <article class="hcard">
     <div class="hcard-head"><span class="hcard-title">Remediated</span><span class="badge-soft">{{ hs.pct|pct }}</span></div>
-    <div><span class="stat">{{ hs.rem|inr }}</span><span class="stat-unit">MT remediated</span></div>
+    <div><span class="stat">{{ hs.rem|inr }}</span><span class="stat-unit">MT</span></div>
     <div class="bar"><span style="width:{{ '%.1f'|format(hs.pct) }}%"></span></div>
-    <div class="stat-note">of <strong>{{ hs.target|inr }} MT</strong> awarded · <strong>{{ hs.remaining|inr }} MT</strong> remaining</div>
+    <div class="stat-note">of <strong>{{ hs.target|inr }} MT</strong> awarded</div>
+    <div class="stat-foot"><strong>{{ hs.remaining|inr }} MT</strong> remaining</div>
   </article>
   <article class="hcard">
     <div class="hcard-head"><span class="hcard-title">Required pace</span><span class="badge-soft {{ '' if hs.pace_ok else 'warn' }}">{% if hs.days_left > 0 %}{{ hs.days_left }} days left{% elif hs.remaining > 0 %}Overdue{% else %}Done{% endif %}</span></div>
     <div><span class="stat">{% if hs.required is none %}{{ 'Overdue' if hs.remaining > 0 else 'Done' }}{% else %}{{ hs.required|inr }}{% endif %}</span><span class="stat-unit">MT/day needed</span></div>
     <div class="bar"><span class="{{ 'ok' if hs.pace_ok else 'warn' }}" style="width:{{ '%.1f'|format(((hs.avg or 0)|share(hs.required)) if hs.required else 100) }}%"></span></div>
-    <div class="stat-note">{% if hs.avg is not none %}averaging <strong>{{ hs.avg|inr }} MT/day</strong> since {{ hs.start }}{% else %}no start date in the data{% endif %} · deadline {{ hs.end }}</div>
+    <div class="stat-note">{% if hs.avg is not none %}averaging <strong>{{ hs.avg|inr }} MT/day</strong>{% else %}no start date in the data{% endif %}</div>
+    <div class="stat-foot">Deadline {{ hs.end }}</div>
   </article>
   <article class="hcard">
     <div class="hcard-head"><span class="hcard-title">Completion</span><span class="badge-soft warn">{{ hs.active }} in progress</span></div>
@@ -70,10 +72,11 @@
     <div class="stat-note"><strong>{{ hs.ulbs }} ULBs</strong> · {{ hs.done }} completed · {{ hs.idle }} not started</div>
   </article>
   <article class="hcard">
-    <div class="hcard-head"><span class="hcard-title">Disposal</span><span class="badge-soft">{{ '%.0f'|format(hs.disp_pct) }}% of remediated</span></div>
-    <div><span class="stat">{{ hs.disp|inr }}</span><span class="stat-unit">MT disposed</span></div>
+    <div class="hcard-head"><span class="hcard-title">Disposal</span></div>
+    <div><span class="stat">{{ hs.disp|inr }}</span><span class="stat-unit">MT</span></div>
     {{ segbar(hs, 'useg-lg') }}
     <div class="u-legend">{% for s in hs.segs %}<span><i class="useg-{{ s.key }}"></i>{{ s.label }} <strong>{{ s.mt|inr }}</strong></span>{% endfor %}</div>
+    <div class="stat-foot">{{ '%.0f'|format(hs.disp_pct) }}% of remediated</div>
   </article>
 </section>
 
@@ -114,17 +117,16 @@
   <input class="form-control u-ctl" type="search" name="q" value="{{ st.q }}" placeholder="Search ULB…">
   <select class="form-select u-ctl" name="agency" onchange="this.form.submit()"><option value="">All agencies</option>{% for a in agencies %}<option {{ 'selected' if a == st.agency }}>{{ a }}</option>{% endfor %}</select>
   <input type="hidden" name="group" value="{{ st.group }}">
-  <button class="btn btn-outline-secondary">Search</button>
+  <button class="btn btn-primary">Search</button>
   {% if st.q or st.agency %}<a class="btn btn-link btn-sm text-decoration-none" href="{{ link(q='', agency='') }}">Clear</a>{% endif %}
-  <span class="ms-auto text-secondary small">{{ groups|length }} group{{ '' if groups|length == 1 else 's' }} · {{ n_rows }} entr{{ 'y' if n_rows == 1 else 'ies' }}</span>
-  <a class="btn btn-sm btn-outline-secondary" href="{{ link(open='none' if open_all else 'all') }}">{{ 'Collapse all' if open_all else 'Expand all' }}</a>
+  <a class="btn btn-outline-secondary ms-auto" href="{{ link(open='none' if open_all else 'all') }}">{{ 'Collapse all' if open_all else 'Expand all' }}</a>
 </form>
 
 {# ---- grouped table ---- #}
 <div class="hcard p-0 overflow-hidden u-table">
   <div class="u-line u-thead">
     <span></span>
-    {% for key, label in [('name', 'ULB' if st.group == 'phase' else 'ULB / phase' if st.group == 'site' else 'Agency / ULB / phase'), ('count', 'Phases · agency' if st.group == 'site' else 'ULBs · agency'), ('pct', 'Target MT'), ('pct', 'Remediated'), ('pct', 'Done'), ('disp', 'Disposed · % of rem.')] %}
+    {% for key, label in [('name', 'ULB' if st.group == 'phase' else 'ULB / phase' if st.group == 'site' else 'Agency / ULB / phase'), ('count', 'Phases · agency' if st.group == 'site' else 'ULBs · agency'), ('pct', 'Target'), ('pct', 'Remediated'), ('pct', 'Done'), ('disp', 'Disposed')] %}
       <a class="th-sort{{ ' is-active' if st.sort == key }}" href="{{ link(sort=key, dir=('asc' if (st.sort == key and st.desc) else 'desc' if st.sort == key else 'asc')) }}">{{ label }}<i class="bi {{ 'bi-caret-up-fill' if st.sort == key and not st.desc else 'bi-caret-down-fill' if st.sort == key else 'bi-arrow-down-up' }}"></i></a>
     {% endfor %}<span></span>
   </div>
@@ -135,7 +137,7 @@
       {% if sec.header %}<details class="u-section" open><summary class="u-line u-shead"><i class="bi bi-chevron-right u-chev"></i>{{ line(sec.header, sec.header.name, sec.header.meta) }}<span></span></summary>{% endif %}
       {% for it in sec.rows %}{% set r = it.r %}
       <details class="u-entry">
-        <summary class="u-line u-row"><i class="bi bi-chevron-right u-chev"></i>{{ line(it, it.name, r.agency_name or '—', it.sub) }}<span>{% if r.slug %}<a class="u-open" href="{{ url_for('sites.site_view', slug=r.slug) }}" title="Open this site's records (sign in)"><i class="bi bi-box-arrow-up-right"></i></a>{% endif %}</span></summary>
+        <summary class="u-line u-row"><i class="bi bi-chevron-right u-chev"></i>{{ line(it, it.name, r.agency_name or '—', it.sub) }}<span></span><span class="u-openwrap">{% if r.slug %}<a class="u-open" href="{{ url_for('sites.site_view', slug=r.slug) }}" title="Open this site's records (sign in)"><i class="bi bi-box-arrow-up-right"></i></a>{% endif %}</span></summary>
         <div class="u-detail">
           <div>
             <div class="hcard-title mb-2">Disposal of {{ it.rem|inr }} MT remediated</div>
@@ -167,9 +169,9 @@
     <span></span>
     <span class="u-name"><span class="u-title">Total</span><span class="u-sub">{{ n_ulbs }} ULBs · {{ n_rows }} entries · {{ st.phase_label }}</span></span>
     <span class="u-meta">{{ groups|length }} group{{ '' if groups|length == 1 else 's' }}</span>
-    <span class="u-num">{{ totals.target|inr }}</span>
-    <span class="u-num">{{ totals.rem|inr }}</span>
-    <span class="u-num u-pctv {{ pctcls(totals.pct) }}">{{ totals.pct|pct }}</span>
+    <span class="u-num">{{ totals.target|inr }} <span class="text-tertiary">MT</span></span>
+    <span class="u-num">{{ totals.rem|inr }} <span class="text-tertiary">MT</span></span>
+    <span class="u-pctv {{ pctcls(totals.pct) }}">{{ totals.pct|pct }}</span>
     <span class="u-disp"><span>{{ totals.disp|inr }} <span class="text-tertiary">MT</span></span><strong class="{{ pctcls(totals.disp_pct) }}">{{ '%.0f'|format(totals.disp_pct) }}%</strong></span>
     <span></span>
   </div>

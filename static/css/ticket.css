@@ -1,0 +1,50 @@
+/* ---------------------------------------------------------------------------
+   Ticket sheet — a screen copy of the weighbridge PDF (enhanced_pdf_creator).
+   A4 width, Helvetica, black rules, centred headings. No theme tokens: this
+   must look the same in every style and on paper.
+   --------------------------------------------------------------------------- */
+*{box-sizing:border-box}
+body{margin:0;background:#8a8a8a;color:#000;
+     font-family:Helvetica,Arial,"Liberation Sans",sans-serif;font-size:11pt;line-height:1.35}
+.tk-page{width:210mm;min-height:297mm;margin:16px auto;padding:18mm 16mm;background:#fff}
+
+.tk-head{text-align:center;margin-bottom:14pt}
+.tk-head h1{font-size:18pt;font-weight:bold;margin:0}
+.tk-addr{font-size:12pt;margin:3pt 0 0}
+
+.tk-printed{font-size:11pt;margin:14pt 0 0}
+.tk-ticket{text-align:center;font-size:18pt;font-weight:bold;margin:8pt 0 14pt}
+.tk-section{text-align:center;font-size:13pt;font-weight:bold;margin:14pt 0 6pt}
+
+.tk-info,.tk-weigh,.tk-imgs{width:100%;border-collapse:collapse}
+/* Vehicle information: one outer box, no inner rules — as in the PDF. */
+.tk-info{border:1.5px solid #000}
+.tk-info th,.tk-info td{padding:5pt 7pt;text-align:left;vertical-align:top;font-size:11pt}
+.tk-info th{font-weight:bold;white-space:nowrap;width:1%}
+
+/* Weighment details: fully ruled grid. */
+.tk-weigh{border:1px solid #000}
+.tk-weigh td{border:1px solid #000;padding:5pt 7pt;font-size:11pt}
+.tk-weigh td:first-child,.tk-weigh td:nth-child(3){width:20%}
+.tk-b{font-weight:bold}
+
+/* Images: caption bar above each photo, cells butted together. */
+.tk-imgs{border:1px solid #000}
+.tk-imgs th{background:#d9d9d9;border:1px solid #000;padding:4pt;font-size:10pt;
+            font-weight:bold;text-align:center;width:50%}
+.tk-imgs td{border:1px solid #000;padding:0;height:62mm;background:#000;vertical-align:middle}
+.tk-imgs img{display:block;width:100%;height:62mm;object-fit:cover}
+.tk-missing{display:flex;align-items:center;justify-content:center;height:62mm;
+            background:#f2f2f2;color:#555;font-size:10pt}
+
+.tk-print{position:fixed;top:14px;right:16px;padding:8px 16px;border:0;border-radius:6px;
+  background:#2f7d52;color:#fff;font:600 13px Helvetica,Arial,sans-serif;cursor:pointer}
+.tk-print:hover{filter:brightness(1.08)}
+
+@media print{
+  body{background:#fff}
+  .tk-page{width:auto;min-height:0;margin:0;padding:0}
+  .tk-print{display:none}
+  .tk-imgs,.tk-weigh,.tk-info{break-inside:avoid}
+  @page{size:A4;margin:14mm}
+}
