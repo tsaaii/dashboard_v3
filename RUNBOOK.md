@@ -101,6 +101,16 @@ location distinguishes entries (Kadiri1 / Kadiri2). Dates accept dd-mm-yyyy or y
 `link_to` (or site_name) matching `sites_master.csv` adds the open-site icon on the row.
 Phase tabs order themselves: "...current" first, then Phase 2, 1, "Phase 1 - 15% Excess", Old.
 
+## Weighbridge photos
+
+`/reports` shows a camera chip per record when the API reports captures
+(`image_slots`, derived from the upstream `images{}` dict). It opens
+`/record-images/<site>/<date>/<ticket>` — a 2x2 sheet served through Flask, never
+directly from the records API, so the open upstream endpoint is not published in a
+gated page. Global login sees all sites; a per-site login only the upstream names in
+that slug's `api_site_names` (exact match). Bytes are cached in-process (48 MB, 15 min)
+and in the browser (`private, max-age=86400`); Admin → Refresh cache clears it.
+
 ## Access-request emails (Gmail SMTP)
 
 1. Gmail account with 2-step verification on → myaccount.google.com/apppasswords → create an
