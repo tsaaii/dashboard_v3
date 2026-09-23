@@ -12,7 +12,6 @@ Query string:
     agency  one agency, or blank
     sort    name | count | pct | disp     dir = asc | desc
     open    all | none                    expand or collapse every group
-    roll    ULB name for the roll-up box; off = entry ids excluded from it
 
 Every number here is a plain sum over sites_phases.csv rows. "ULB" means
 site_name (one town), an "entry" is one row (one phase of that town).
@@ -21,7 +20,8 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import date
+from datetime import date, timedelta
+from math import ceil
 
 from flask import Blueprint, Response, render_template, request, url_for
 
@@ -34,6 +34,7 @@ bp = Blueprint("ulb", __name__, url_prefix="/ulb")
 
 SEGS = [("rdf", "RDF"), ("inert", "Inert"), ("soil", "Soil"), ("cnd", "C&D")]
 GROUPS = [("phase", "By phase"), ("site", "By ULB"), ("agency", "By agency")]
+EXPECTED_DISPOSAL = 0.85     # share of awarded MT that should leave the site; the rest is moisture
 
 
 # ---- aggregation helpers ---------------------------------------------------
@@ -46,6 +47,8 @@ def agg(rows: list[dict]) -> dict:
     o["remaining"] = max(0.0, o["target"] - o["rem"])
     o["pct"] = min(100.0, o["rem"] / o["target"] * 100) if o["target"] else 0.0
     o["disp_pct"] = (o["disp"] / o["rem"] * 100) if o["rem"] else 0.0
+    o["expected"] = o["target"] * EXPECTED_DISPOSAL          # 85% of awarded; 15% is moisture loss
+    o["disp_exp_pct"] = (o["disp"] / o["expected"] * 100) if o["expected"] else 0.0
     o["over"] = o["disp"] > o["rem"] * 1.001 and o["rem"] > 0
     o["gap"] = max(0.0, o["rem"] - o["disp"])
     base = max(o["disp"], o["rem"]) or 1.0
@@ -77,8 +80,6 @@ def _state() -> dict:
         "sort": a.get("sort") if a.get("sort") in ("name", "count", "pct", "disp") else "name",
         "desc": a.get("dir") == "desc",
         "open": a.get("open", ""),
-        "roll": (a.get("roll") or "").strip(),
-        "off": {int(x) for x in a.getlist("off") if x.isdigit()},
     }
 
 
@@ -117,12 +118,79 @@ def _kpis(rows: list[dict], today: date) -> dict:
             "pace_ok": required is None or avg is None or avg >= required}
 
 
+# ---- ULB card ---------------------------------------------------------------
+def _d(v: str):
+    try:
+        return date.fromisoformat(v)
+    except ValueError:
+        return None
+
+
+def ulb_card(entries: list[dict], today: date) -> dict:
+    """Everything the expanded card shows for one ULB: each phase (sites in the
+    same phase merged, e.g. Palacole1 + Palacole2), the net across phases, the
+    start-date timeline, and the pace verdict against the open phase's deadline."""
+    by_phase: dict[str, list[dict]] = {}
+    for e in entries:
+        by_phase.setdefault(e["phase"], []).append(e)
+    phases_out = []
+    for ph, rs in by_phase.items():
+        a = agg(rs)
+        deadline = max((r["deadline_date"] for r in rs), default="")
+        start = min((r["start_date"] for r in rs if r["start_date"]), default="")
+        dl = _d(deadline)
+        if a["rem"] >= a["target"] - 0.5:
+            state = "completed"
+        elif dl and dl < today:
+            state = "overdue"
+        else:
+            state = "open"
+        phases_out.append({**a, "phase": ph, "start": start, "deadline": deadline, "state": state,
+                           "capacity": sum(r["capacity"] for r in rs),
+                           "sites": sorted({r["location"] for r in rs}, key=str.lower),
+                           "agencies": sorted({r["agency_name"] for r in rs if r["agency_name"]}, key=str.lower),
+                           "rows": rs})
+    phases_out.sort(key=lambda p: phase_rank(p["phase"]))
+    net = agg(entries)
+
+    # pace: only the phases still open count; their capacities add up
+    open_ph = [p for p in phases_out if p["state"] == "open"]
+    pace = {"kind": "completed" if not open_ph and net["remaining"] <= 0.5 else "overdue" if not open_ph else "open"}
+    if open_ph:
+        remaining = sum(p["remaining"] for p in open_ph)
+        capacity = sum(p["capacity"] for p in open_ph)
+        deadline = max(p["deadline"] for p in open_ph)
+        dl = _d(deadline)
+        days_left = (dl - today).days if dl else None
+        days_needed = (remaining / capacity) if capacity else None
+        finish = (today + timedelta(days=ceil(days_needed))) if days_needed is not None else None
+        on_track = days_needed is not None and days_left is not None and days_needed <= days_left
+        need_rate = (remaining / days_left) if days_left and days_left > 0 else None
+        pace.update(remaining=remaining, capacity=capacity, deadline=deadline, days_left=days_left,
+                    days_needed=days_needed, finish=finish.isoformat() if finish else "", on_track=on_track,
+                    need_rate=need_rate, label=", ".join(p["phase"] for p in open_ph))
+    elif pace["kind"] == "overdue":
+        pace.update(remaining=net["remaining"],
+                    label=", ".join(p["phase"] for p in phases_out if p["state"] == "overdue"))
+
+    # timeline: one row per CSV entry (a phase with two agencies/sites stays two rows), newest start first
+    state_of = {p["phase"]: p["state"] for p in phases_out}
+    timeline = []
+    for e in entries:
+        a = agg([e])
+        st = "completed" if a["rem"] >= a["target"] - 0.5 else "overdue" if state_of[e["phase"]] == "overdue" else "open"
+        timeline.append({**a, "id": e["id"], "phase": e["phase"], "start": e["start_date"], "deadline": e["deadline_date"],
+                         "state": st, "capacity": e["capacity"], "site": e["location"], "agency": e["agency_name"]})
+    timeline.sort(key=lambda t: (t["start"] or "", phase_rank(t["phase"]), t["site"].lower()), reverse=True)
+    return {"phases": phases_out, "net": net, "pace": pace, "timeline": timeline,
+            "sites": sorted({e["location"] for e in entries}, key=str.lower)}
+
+
 # ---- grouping ---------------------------------------------------------------
 def _row(r: dict, all_rows: list[dict], name: str, sub: str) -> dict:
     a = agg([r])
-    others = [o for o in all_rows if o["site_name"] == r["site_name"] and o["id"] != r["id"]]
-    others.sort(key=lambda o: phase_rank(o["phase"]))
-    return {**a, "r": r, "name": name, "sub": sub, "others": [{**agg([o]), "r": o} for o in others]}
+    ulb = [o for o in all_rows if o["site_name"] == r["site_name"]]
+    return {**a, "r": r, "name": name, "sub": sub, "ulb": ulb}
 
 
 def _groups(rows: list[dict], all_rows: list[dict], st: dict) -> list[dict]:
@@ -181,14 +249,7 @@ def ulb_view():
     today = config.today_ist()
     rows = _filtered(all_rows, st)
 
-    # roll-up: one ULB, all its entries, any of them switchable off
-    roll = None
-    ulb_names = sorted(by_ulb(all_rows), key=str.lower)
-    if st["roll"] in by_ulb(all_rows):
-        entries = sorted(by_ulb(all_rows)[st["roll"]], key=lambda r: phase_rank(r["phase"]))
-        on = [r for r in entries if r["id"] not in st["off"]]
-        roll = {"name": st["roll"], "entries": entries, "on_ids": {r["id"] for r in on}, **agg(on)}
-
+    cards = {name: ulb_card(rs, today) for name, rs in by_ulb(all_rows).items()}
     groups = _groups(rows, all_rows, st)
     open_all = st["open"] == "all" or (st["open"] != "none" and len(groups) <= 1)
     st["phase_label"] = ", ".join(sorted(st["phases"], key=phase_rank)) if st["phases"] else "all phases"
@@ -197,8 +258,8 @@ def ulb_view():
         phase_tabs=[""] + phases.phases(), group_tabs=GROUPS,
         agencies=sorted({r["agency_name"] for r in all_rows if r["agency_name"]}, key=str.lower),
         hs=_kpis(rows, today), groups=groups, n_rows=len(rows), n_ulbs=len(by_ulb(rows)),
-        ulb_names=ulb_names, roll=roll, open_all=open_all, segs=SEGS,
-        today_str=today.strftime("%d %b %Y"),
+        cards=cards, open_all=open_all, segs=SEGS, expected_share=int(EXPECTED_DISPOSAL * 100),
+        today_str=today.strftime("%d %b %Y"), today_iso=today.isoformat(),
     )
 
 

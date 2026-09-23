@@ -141,6 +141,25 @@ def _record(site: str, date: str, ticket: str) -> dict:
     return {}
 
 
+def _vehicle_day(site: str, date: str, vehicle: str) -> list[dict]:
+    """Every trip this vehicle made at this site on this day, in weigh-in
+    order, so the viewer can step to the previous / next trip and compare
+    photos. Empty on any failure — navigation is optional, the photos are not."""
+    if not vehicle:
+        return []
+    try:
+        day = _iso(date)
+        payload = records_api.fetch_records(
+            {"site_name": site, "vehicle_no": vehicle, "start_date": day, "end_date": day}, page=1, limit=200)
+        rows = [r for r in (payload.get("records") or [])
+                if (r.get("vehicle_no") or "").strip().upper() == vehicle.strip().upper()]
+        rows.sort(key=lambda r: (str(r.get("first_timestamp") or r.get("time") or ""), str(r.get("ticket_no") or "")))
+        return rows
+    except Exception:                                 # noqa: BLE001
+        logger.warning("vehicle-day lookup failed for %s/%s/%s", site, date, vehicle)
+        return []
+
+
 @bp.route("/<site>/<date>/<ticket>")
 def sheet_view(site, date, ticket):
     """Printable ticket sheet: header, vehicle and weighment details, 2x2 photos."""
@@ -169,8 +188,27 @@ def sheet_view(site, date, ticket):
             address = (getattr(st, "address", "") or "").strip()
             break
 
+    # previous / next trip of the same vehicle on the same day
+    trips = _vehicle_day(site, date, (r.get("vehicle_no") or "").strip())
+    idx = next((i for i, t in enumerate(trips) if str(t.get("ticket_no", "")).strip() == ticket.strip()), None)
+
+    def link(t):
+        return url_for("record_images.sheet_view", site=site, date=date, ticket=str(t.get("ticket_no")))
+    prev_t = trips[idx - 1] if idx not in (None, 0) else None
+    next_t = trips[idx + 1] if idx is not None and idx + 1 < len(trips) else None
+    if prev_t is None and r.get("previous_ticket_no"):          # API knows the previous even if the list lookup failed
+        prev_t = {"ticket_no": r["previous_ticket_no"]}
+    nav = {
+        "prev": link(prev_t) if prev_t else "", "prev_ticket": str(prev_t.get("ticket_no", "")) if prev_t else "",
+        "next": link(next_t) if next_t else "", "next_ticket": str(next_t.get("ticket_no", "")) if next_t else "",
+        "pos": (idx + 1) if idx is not None else None, "count": len(trips),
+        "trips": [{"ticket": str(t.get("ticket_no", "")), "url": link(t), "cur": i == idx,
+                   "in": str(t.get("first_timestamp") or "")[-8:-3], "net": t.get("net_weight"),
+                   "delta": t.get("vehicle_delta") or ""} for i, t in enumerate(trips)],
+    }
+
     return render_template(
-        "record_images.html", ticket=ticket, site=site, date=r.get("date") or date,
+        "record_images.html", ticket=ticket, site=site, date=r.get("date") or date, nav=nav,
         record=r, tiles=tiles, address=address, agency=r.get("agency_name", ""),
         first_w=kg(r.get("first_weight")), second_w=kg(r.get("second_weight")), net=kg(r.get("net_weight")),
         printed=datetime.now(config.IST).strftime("%d-%m-%Y %H:%M:%S"))

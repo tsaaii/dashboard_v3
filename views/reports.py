@@ -3,6 +3,7 @@ Reports — Records Explorer over the weighbridge API.
 
     GET /reports              the screen (filters + first page of rows)
     GET /reports/rows         HTMX fragment: one page of the table
+    GET /reports/qc           HTMX fragment: QC mode — trip and vehicle deltas
     GET /reports/export.pdf   summary PDF of everything matching the filters
 
 Everything lives in the query string, so any view can be bookmarked or shared:
@@ -13,6 +14,7 @@ Everything lives in the query string, so any view can be bookmarked or shared:
     cols=date&cols=time&...     chosen columns, in order
     sort=<column> dir=asc|desc  sort of the current page
     page limit preset
+    mode=records|qc  min_trip min_turn flagged=1     QC mode controls
 
 Rows come from data/records_api.py (cached, with diagnostics); column
 definitions from data/pdf_export.py, so the table and the PDF agree.
@@ -24,7 +26,7 @@ from datetime import date, timedelta
 from flask import Blueprint, Response, render_template, request
 
 import config
-from data import phases, records_api
+from data import phases, qc, records_api
 from data.pdf_export import (COLUMN_SCHEMA, DEFAULT_COLUMNS, build_pdf_filename,
                              build_summary_pdf, resolve_columns)
 from views.login import login_required
@@ -38,6 +40,7 @@ TEXT_FILTERS = ["vehicle_no", "ticket_no"]
 NUM_FILTERS = ["min_net_weight", "max_net_weight"]
 FILTER_KEYS = ["start_date", "end_date"] + SELECT_FILTERS + ADV_SELECTS + TEXT_FILTERS + NUM_FILTERS
 PAGE_SIZES = [25, 50, 100, 250]
+QC_MAX_DAYS = 7           # QC needs every record of a site-day in memory, so the range is capped
 PRESETS = {"24h": 1, "7d": 7, "30d": 30}
 
 
@@ -209,7 +212,43 @@ def reports_view():
         advanced=any(f[k] for k in ADV_SELECTS + NUM_FILTERS),
         panel=_phase_panel(f), ph=request.args.getlist("ph"), po=_phase_options(f),
         active=[(k, v) for k, v in f.items() if v and k not in ("start_date", "end_date")],
+        mode="qc" if request.args.get("mode") == "qc" else "records",
+        min_trip=request.args.get("min_trip") or qc.DEFAULT_MIN_TRIP,
+        min_turn=request.args.get("min_turn") or qc.DEFAULT_MIN_TURN,
+        flagged=request.args.get("flagged") == "1",
     )
+
+
+@bp.route("/qc")
+@login_required
+def qc_rows():
+    """QC mode: pulls every record in the filter (not one page) so the
+    turnaround chain per vehicle-day is complete, then annotates it."""
+    f = {k: v for k, v in _filters().items() if v}
+    today = config.today_ist()
+    start = date.fromisoformat(f["start_date"]) if f.get("start_date") else None
+    end = date.fromisoformat(f["end_date"]) if f.get("end_date") else today
+    if start is None or (end - start).days >= QC_MAX_DAYS:
+        start = end - timedelta(days=QC_MAX_DAYS - 1)
+        f["start_date"], f["end_date"] = start.isoformat(), end.isoformat()
+        clipped = True
+    else:
+        clipped = False
+
+    def _num(key, default):
+        try:
+            return float(request.args.get(key) or default)
+        except ValueError:
+            return float(default)
+    min_trip, min_turn = _num("min_trip", qc.DEFAULT_MIN_TRIP), _num("min_turn", qc.DEFAULT_MIN_TURN)
+
+    bundle = records_api.fetch_all_records(f, hard_cap=records_api.EXPORT_HARD_CAP)
+    raw = bundle["records"]
+    good = [r for r in raw if _valid_weight(r) or (r.get("record_status") or "").lower() == "incomplete"]
+    report = qc.build(good, min_trip=min_trip, min_turn=min_turn, flagged_only=request.args.get("flagged") == "1")
+    return render_template("partials/report_qc.html", q=report, f=f, clipped=clipped, max_days=QC_MAX_DAYS,
+                           capped=bundle["capped"], error=bundle["error"], dropped=len(raw) - len(good),
+                           total=bundle["total_in_db"])
 
 
 @bp.route("/rows")

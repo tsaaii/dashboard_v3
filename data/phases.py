@@ -6,7 +6,7 @@ assigned work in.
 
     location,site_name,phase,agency_name,cluster,target_mt,remediated_mt,
     soil_disposed_mt,rdf_disposed_mt,cnd_disposed_mt,inert_disposed_mt,
-    start_date,deadline_date,status,link_to,notes
+    start_date,deadline_date,status,link_to,notes,processing_power
 
     location       the PLACE, stable across contractors: "Kadiri". Rows with the
                    same location are grouped together. Defaults to site_name.
@@ -19,6 +19,9 @@ assigned work in.
                    clicked. Defaults to site_name. Use it when the live page
                    is under a different name ("Tharuni_Kadiri") than the row.
     status         active | completed | not started (free text)
+    processing_power  machine capacity in MT/day for that site row. A ULB with
+                   two site rows in one phase (Palacole1 + Palacole2) has the
+                   sum of both as its capacity.
 
 Numbers may contain commas ("1,20,000"). Missing file => empty list, and
 /sites falls back to the current sites_master.csv view.
@@ -38,6 +41,8 @@ from data._cache import TTLCache
 logger = logging.getLogger(__name__)
 FILE = "sites_phases.csv"
 REQUIRED = ["phase", "site_name", "agency_name", "target_mt"]
+# site_name spellings that must fold into one ULB. Left side lower-case.
+ALIASES = {"proddaturu": "Proddatur"}
 _cache = TTLCache(config.CACHE_TTL_SECONDS)
 
 
@@ -81,8 +86,11 @@ def _load() -> list[dict]:
     text = text.lstrip("\ufeff")
     by_name = {master.slugify(s.site_name): s.slug for s in master.get_sites() if s.is_renderable}
     rows = []
-    for i, r in enumerate(csv.DictReader(io.StringIO(text))):
+    reader = csv.DictReader(io.StringIO(text))
+    reader.fieldnames = [(h or "").strip() for h in reader.fieldnames or []]   # " processing_power"
+    for i, r in enumerate(reader):
         name = (r.get("site_name") or "").strip()
+        name = ALIASES.get(name.lower(), name)
         if not name:
             continue
         target, done = _num(r.get("target_mt")), _num(r.get("remediated_mt"))
@@ -104,6 +112,7 @@ def _load() -> list[dict]:
             "deadline_date": _iso(r.get("deadline_date")),
             "status": (r.get("status") or "").strip().lower(),
             "notes": (r.get("notes") or "").strip(),
+            "capacity": _num(r.get("processing_power")),     # machine capacity, MT/day, for this site row
             "slug": by_name.get(master.slugify(link)),       # None => no live page
         })
     logger.info("Loaded %d phase rows", len(rows))

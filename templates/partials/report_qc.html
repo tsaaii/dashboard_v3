@@ -1,0 +1,64 @@
+{# QC mode. One block per site-day; inside it one strip per vehicle with its
+   trips in weigh-in order. Trip Δ = out − in on the same ticket; Vehicle Δ =
+   this trip's in − the previous trip's out for the same vehicle. #}
+{% macro mins(v) -%}
+  {%- if v is none %}<span class="text-tertiary">—</span>
+  {%- elif v < 0 %}<span class="c-bad">{{ '%.0f'|format(v) }}m</span>
+  {%- elif v >= 60 %}{{ (v // 60)|int }}h {{ '%02d'|format((v % 60)|int) }}m
+  {%- else %}{{ '%.0f'|format(v) }}m{% endif -%}
+{%- endmacro %}
+
+{% if error %}<div class="alert alert-warning py-2 m-3">Weighbridge API: {{ error }}</div>{% endif %}
+
+<div class="rp-bar">
+  <span><strong>{{ q.trips|inr }}</strong> trips · <strong>{{ q.vehicles|inr }}</strong> vehicle-days</span>
+  <span class="rp-sum">Median trip <strong>{{ mins(q.med_trip) }}</strong> · median return <strong>{{ mins(q.med_turn) }}</strong></span>
+  {% if q.flagged %}<span class="badge-soft bad">{{ q.flagged }} flagged</span>{% else %}<span class="badge-soft ok">nothing flagged</span>{% endif %}
+  {% if clipped %}<span class="rp-dropped">Range clipped to the last {{ max_days }} days ending {{ f.end_date }} — QC needs whole days in memory</span>{% endif %}
+  {% if capped %}<span class="rp-dropped">Only the first {{ q.trips|inr }} of {{ total|inr }} records loaded — narrow the site or dates</span>{% endif %}
+  {% if dropped %}<span class="rp-dropped" title="Net weight of 0, or not a multiple of 5 kg">{{ dropped }} bad-weight row{{ '' if dropped == 1 else 's' }} hidden</span>{% endif %}
+  <span class="ms-auto text-tertiary">fast trip &lt; {{ q.min_trip|int }}m · fast return &lt; {{ q.min_turn|int }}m</span>
+</div>
+
+{% for s in q.sites %}
+  {% for d in s.days %}
+  <section class="qc-day">
+    <div class="qc-day-head">
+      <span class="qc-site">{{ s.name }}</span>
+      <span class="qc-date">{{ d.day }}</span>
+      <span class="text-tertiary">{{ d.vehicles|length }} vehicle{{ '' if d.vehicles|length == 1 else 's' }} · {{ d.n }} trip{{ '' if d.n == 1 else 's' }}</span>
+      {% if d.flagged %}<span class="badge-soft bad">{{ d.flagged }} flagged</span>{% endif %}
+    </div>
+    <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0 qc-table">
+      <thead><tr><th>Vehicle</th><th>#</th><th>Ticket</th><th>In</th><th>Out</th><th class="num">Trip Δ</th><th class="num">Vehicle Δ</th><th>Prev ticket</th><th class="num">Net kg</th><th>Material</th><th>Flags</th><th class="rp-imgh">Photos</th></tr></thead>
+      <tbody>
+      {% for v in d.vehicles %}
+        {% for t in v.trips %}
+        <tr class="{{ 'is-flag' if t.flags }}{{ ' is-first' if loop.first }}">
+          <td class="qc-veh">{% if loop.first %}<span class="fw-semibold">{{ v.vehicle or '—' }}</span><span class="d-block small text-tertiary">{{ v.n }} trips · med {{ mins(v.med_trip) }}{% if v.med_turn is not none %} / {{ mins(v.med_turn) }}{% endif %}</span>{% endif %}</td>
+          <td class="text-tertiary">{{ loop.index }}</td>
+          <td>{{ t.ticket }}</td>
+          <td class="num">{{ t.in or '—' }}</td>
+          <td class="num">{{ t.out or '—' }}</td>
+          <td class="num {{ 'c-bad' if 'fast trip' in t.flags or 'invalid trip' in t.flags }}">{{ mins(t.trip) }}</td>
+          <td class="num {{ 'c-bad' if 'fast return' in t.flags or 'overlap' in t.flags }}">{{ mins(t.turn) }}</td>
+          <td class="text-tertiary">{{ t.prev or '—' }}</td>
+          <td class="num">{{ t.net|inr }}</td>
+          <td class="text-secondary">{{ t.material }}</td>
+          <td>{% for fl in t.flags %}<span class="badge-soft bad me-1">{{ fl }}</span>{% endfor %}</td>
+          <td class="rp-imgs">{% if t.images %}<a class="rp-photo" target="_blank" rel="noopener" href="{{ url_for('record_images.sheet_view', site=t.site_name, date=t.date, ticket=t.ticket_no) }}"><i class="bi bi-camera-fill"></i></a>{% else %}<span class="text-tertiary">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+  <div class="text-center text-secondary py-5">
+    <div class="fs-5 fw-semibold mb-1">{{ 'Nothing flagged' if request.args.get('flagged') == '1' else 'No records found' }}</div>
+    <div>{{ 'Every trip in this range clears both thresholds.' if request.args.get('flagged') == '1' else 'Pick a site and a day, or widen the filters.' }}</div>
+  </div>
+{% endfor %}

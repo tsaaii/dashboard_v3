@@ -2,7 +2,7 @@
 {% block title %}Data by ULB — Swachh Andhra{% endblock %}
 
 {# ---- helpers ---- #}
-{% macro link() -%}{% set kw = kwargs %}{{ url_for('ulb.ulb_view', phase=kw.get('phases', st.phases), group=kw.get('group', st.group), q=kw.get('q', st.q), agency=kw.get('agency', st.agency), sort=kw.get('sort', st.sort), dir=kw.get('dir', 'desc' if st.desc else 'asc'), open=kw.get('open', st.open), roll=kw.get('roll', st.roll)) }}{%- endmacro %}
+{% macro link() -%}{% set kw = kwargs %}{{ url_for('ulb.ulb_view', phase=kw.get('phases', st.phases), group=kw.get('group', st.group), q=kw.get('q', st.q), agency=kw.get('agency', st.agency), sort=kw.get('sort', st.sort), dir=kw.get('dir', 'desc' if st.desc else 'asc'), open=kw.get('open', st.open)) }}{%- endmacro %}
 {% macro segbar(a, cls='') -%}
   <span class="useg {{ cls }}">{% for s in a.segs %}<span class="useg-{{ s.key }}" style="width:{{ '%.1f'|format(s.w) }}%" title="{{ s.label }} {{ s.mt|inr }} MT"></span>{% endfor %}</span>
 {%- endmacro %}
@@ -37,9 +37,9 @@
 <div class="d-flex align-items-center gap-3 flex-wrap">
   <span class="hcard-title">Phase</span>
   <div class="u-tabs">
-    <a href="{{ link(phases=[], roll='') }}" class="{{ 'is-active' if not st.phases }}">All phases</a>
+    <a href="{{ link(phases=[]) }}" class="{{ 'is-active' if not st.phases }}">All phases</a>
     {% for p in phase_tabs if p %}{% set on = p in st.phases %}
-      <a href="{{ link(phases=(st.phases|reject('equalto', p)|list) if on else st.phases + [p], roll='') }}" class="{{ 'is-active' if on }}"><i class="bi {{ 'bi-check-square-fill' if on else 'bi-square' }}"></i> {{ p }}</a>
+      <a href="{{ link(phases=(st.phases|reject('equalto', p)|list) if on else st.phases + [p]) }}" class="{{ 'is-active' if on }}"><i class="bi {{ 'bi-check-square-fill' if on else 'bi-square' }}"></i> {{ p }}</a>
     {% endfor %}
   </div>
   <span class="text-tertiary small">check more than one to combine phases</span>
@@ -80,36 +80,6 @@
   </article>
 </section>
 
-{# ---- ULB roll-up ---- #}
-<details class="hcard u-roll" {{ 'open' if roll }}>
-  <summary><i class="bi bi-chevron-right u-chev"></i><span class="fw-semibold">ULB roll-up</span><span class="text-secondary small">— pick one ULB and combine any of its phases into one total</span></summary>
-  <form method="get" class="d-flex flex-wrap gap-2 align-items-center mt-3">
-    {% for k in ['group','q','agency','sort','open'] %}<input type="hidden" name="{{ k }}" value="{{ st[k] }}">{% endfor %}{% for p in st.phases %}<input type="hidden" name="phase" value="{{ p }}">{% endfor %}<input type="hidden" name="dir" value="{{ 'desc' if st.desc else 'asc' }}">
-    <select class="form-select u-ctl" name="roll" onchange="this.form.submit()"><option value="">Choose a ULB…</option>{% for n in ulb_names %}<option {{ 'selected' if n == st.roll }}>{{ n }}</option>{% endfor %}</select>
-    {% if roll %}
-      <span class="text-secondary small">{{ roll.on_ids|length }} of {{ roll.entries|length }} entries selected</span>
-      <div class="u-rollitems">
-        {% for e in roll.entries %}{% set on = e.id in roll.on_ids %}
-        <label class="u-rollitem {{ 'is-on' if on }}">
-          <input type="checkbox" name="off" value="{{ e.id }}" {{ 'checked' if not on }} onchange="this.form.submit()" hidden>
-          <span class="u-rollbox"><i class="bi {{ 'bi-check-lg' if on }}"></i></span>
-          <span><span class="fw-semibold">{{ e.phase }}</span><span class="text-tertiary"> · {{ e.agency_name or '—' }}{% if e.location != e.site_name %} · {{ e.location }}{% endif %}</span></span>
-          <span class="ms-auto text-nowrap">{{ e.remediated_mt|inr }} <span class="text-tertiary">/ {{ e.target_mt|inr }}</span></span>
-        </label>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </form>
-  {% if roll %}
-  <div class="u-rollsum">
-    <div><div class="stat-label">Awarded</div><div class="stat-sm">{{ roll.target|inr }}</div><div class="stat-note">MT across {{ roll.n }} entr{{ 'y' if roll.n == 1 else 'ies' }}</div></div>
-    <div><div class="stat-label">Remediated</div><div class="stat-sm">{{ roll.rem|inr }}</div><div class="stat-note">MT · <strong>{{ roll.pct|pct }}</strong> of awarded</div></div>
-    <div><div class="stat-label">Total disposed</div><div class="stat-sm">{{ roll.disp|inr }}</div><div class="stat-note">MT · <strong>{{ '%.1f'|format(roll.disp_pct) }}%</strong> of remediated</div></div>
-    <div><div class="stat-label">Disposal split</div>{{ segbar(roll, 'useg-lg mt-2') }}<div class="u-legend mt-2">{% for s in roll.segs %}<span><i class="useg-{{ s.key }}"></i>{{ s.label }} <strong>{{ '%.0f'|format(s.pct) }}%</strong> <span class="text-tertiary">{{ s.mt|inr }}</span></span>{% endfor %}</div></div>
-  </div>
-  {% endif %}
-</details>
-
 {# ---- toolbar ---- #}
 <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
   {% for p in st.phases %}<input type="hidden" name="phase" value="{{ p }}">{% endfor %}<input type="hidden" name="sort" value="{{ st.sort }}"><input type="hidden" name="dir" value="{{ 'desc' if st.desc else 'asc' }}"><input type="hidden" name="open" value="{{ st.open }}">
@@ -138,25 +108,81 @@
       {% for it in sec.rows %}{% set r = it.r %}
       <details class="u-entry">
         <summary class="u-line u-row"><i class="bi bi-chevron-right u-chev"></i>{{ line(it, it.name, r.agency_name or '—', it.sub) }}<span></span><span class="u-openwrap">{% if r.slug %}<a class="u-open" href="{{ url_for('sites.site_view', slug=r.slug) }}" title="Open this site's records (sign in)"><i class="bi bi-box-arrow-up-right"></i></a>{% endif %}</span></summary>
-        <div class="u-detail">
-          <div>
-            <div class="hcard-title mb-2">Disposal of {{ it.rem|inr }} MT remediated</div>
-            {{ segbar(it, 'useg-lg') }}
-            <div class="u-legend-col mt-2">
-              {% for s in it.segs %}<div><span><i class="useg-{{ s.key }}"></i>{{ s.label }}</span><span>{{ s.mt|inr }} <span class="text-tertiary">{{ '%.1f'|format(s.pct) }}%</span></span></div>{% endfor %}
-              <div><span><i class="useg-gap"></i>Unaccounted</span><span>{{ it.gap|inr }}</span></div>
+        {% set c = cards[r.site_name] %}{% set cur = c.timeline|selectattr('id', 'equalto', r.id)|first %}{% set ph = c.phases|selectattr('phase', 'equalto', r.phase)|first %}
+        <div class="u-detail u-card">
+          <div class="u-card-head">
+            <div><span class="u-card-ulb">{{ r.site_name }}</span><span class="text-tertiary"> · {{ c.sites|join(' + ') }} · {{ c.phases|length }} phase{{ '' if c.phases|length == 1 else 's' }}</span></div>
+            {% if c.pace.kind == 'completed' %}<span class="badge-soft ok"><i class="bi bi-check2-circle"></i> Completed</span>
+            {% elif c.pace.kind == 'overdue' %}<span class="badge-soft bad"><i class="bi bi-exclamation-circle"></i> {{ c.pace.remaining|inr }} MT short · {{ c.pace.label }}</span>
+            {% elif c.pace.on_track %}<span class="badge-soft ok"><i class="bi bi-check2-circle"></i> On track for {{ c.pace.deadline|dmy }}</span>
+            {% else %}<span class="badge-soft bad"><i class="bi bi-speedometer2"></i> Speed up · {{ c.pace.deadline|dmy }}</span>{% endif %}
+          </div>
+
+          {# --- this phase --- #}
+          <section class="u-blk">
+            <div class="u-blk-title">{{ cur.phase }} · {{ cur.site }}<span class="text-tertiary"> · {{ cur.agency or '—' }} · {{ cur.start|dmy }} → {{ cur.deadline|dmy }}</span>
+              <span class="badge-soft {{ 'ok' if cur.state == 'completed' else 'bad' if cur.state == 'overdue' else 'warn' }}">{{ cur.state }}</span></div>
+            <div class="u-stats">
+              <div><div class="stat-label">Awarded</div><div class="stat-md">{{ cur.target|inr }}</div><div class="stat-note">MT</div></div>
+              <div><div class="stat-label">Remediated</div><div class="stat-md">{{ cur.rem|inr }}</div><div class="stat-note">MT to date</div></div>
+              <div><div class="stat-label">Remediated %</div><div class="stat-md {{ pctcls(cur.pct) }}">{{ cur.pct|pct }}</div><div class="stat-note">remediated ÷ awarded</div></div>
+              <div><div class="stat-label">Expected disposal</div><div class="stat-md">{{ cur.expected|inr }}</div><div class="stat-note">{{ expected_share }}% of awarded</div></div>
+              <div><div class="stat-label">Actual disposal</div><div class="stat-md">{{ cur.disp|inr }}</div><div class="stat-note">MT</div></div>
+              <div><div class="stat-label">Disposal %</div><div class="stat-md {{ pctcls(cur.disp_exp_pct) }}">{{ '%.1f'|format(cur.disp_exp_pct) }}%</div><div class="stat-note">actual ÷ expected</div></div>
+              <div><div class="stat-label">Capacity</div><div class="stat-md">{{ cur.capacity|inr }}</div><div class="stat-note">MT/day{% if ph.rows|length > 1 %} · {{ ph.capacity|inr }} across {{ ph.rows|length }} in this phase{% endif %}</div></div>
             </div>
-          </div>
-          <dl class="u-meta-grid">
-            <dt>Phase</dt><dd>{{ r.phase }}</dd><dt>Location</dt><dd>{{ r.location }}</dd><dt>Cluster</dt><dd>{{ r.cluster or '—' }}</dd>
-            <dt>Start</dt><dd>{{ r.start_date or '—' }}</dd><dt>Deadline</dt><dd>{{ r.deadline_date or '—' }}</dd><dt>Status</dt><dd>{{ r.status or '—' }}</dd><dt>Notes</dt><dd>{{ r.notes or '—' }}</dd>
-          </dl>
-          {% if it.others %}
-          <div>
-            <div class="hcard-title mb-2">Other phases · {{ r.site_name }}</div>
-            {% for o in it.others %}<div class="u-other"><span><span class="fw-semibold">{{ o.r.phase }}</span> <span class="text-tertiary">{{ o.r.agency_name }}</span></span><span>{{ o.rem|inr }} <span class="text-tertiary">/ {{ o.target|inr }}</span> <span class="badge-soft neutral">{{ o.pct|pct }}</span></span></div>{% endfor %}
-          </div>
-          {% endif %}
+            {{ segbar(cur, 'useg-lg') }}
+            <div class="u-legend">{% for s in cur.segs %}<span><i class="useg-{{ s.key }}"></i>{{ s.label }} <strong>{{ s.mt|inr }}</strong></span>{% endfor %}<span><i class="useg-gap"></i>Unaccounted <strong>{{ cur.gap|inr }}</strong></span></div>
+          </section>
+
+          {# --- net across phases + timeline --- #}
+          <section class="u-blk">
+            <div class="u-blk-title">Net · {{ r.site_name }} across {{ c.phases|length }} phase{{ '' if c.phases|length == 1 else 's' }}</div>
+            <div class="u-stats">
+              <div><div class="stat-label">Net awarded</div><div class="stat-md">{{ c.net.target|inr }}</div><div class="stat-note">MT</div></div>
+              <div><div class="stat-label">Net remediated</div><div class="stat-md">{{ c.net.rem|inr }}</div><div class="stat-note">MT to date</div></div>
+              <div><div class="stat-label">Remediated %</div><div class="stat-md {{ pctcls(c.net.pct) }}">{{ c.net.pct|pct }}</div><div class="stat-note">remediated ÷ awarded</div></div>
+              <div><div class="stat-label">Expected disposal</div><div class="stat-md">{{ c.net.expected|inr }}</div><div class="stat-note">{{ expected_share }}% of awarded</div></div>
+              <div><div class="stat-label">Actual disposal</div><div class="stat-md">{{ c.net.disp|inr }}</div><div class="stat-note">MT</div></div>
+              <div><div class="stat-label">Disposal %</div><div class="stat-md {{ pctcls(c.net.disp_exp_pct) }}">{{ '%.1f'|format(c.net.disp_exp_pct) }}%</div><div class="stat-note">actual ÷ expected</div></div>
+              <div><div class="stat-label">Remaining</div><div class="stat-md">{{ c.net.remaining|inr }}</div><div class="stat-note">MT</div></div>
+            </div>
+            <table class="u-phases">
+              <thead><tr><th>Phase · site</th><th>Started</th><th>Deadline</th><th></th><th class="num">Awarded</th><th class="num">Remediated</th><th class="num">Rem %</th><th class="num">Expected</th><th class="num">Disposed</th><th class="num">Disp %</th></tr></thead>
+              <tbody>
+              {% for p in c.timeline %}
+                <tr class="{{ 'is-cur' if p.id == r.id }}">
+                  <td><span class="fw-semibold">{{ p.phase }}</span>{% if p.site != r.site_name %}<span class="text-secondary"> · {{ p.site }}</span>{% endif %}<span class="text-tertiary d-block small">{{ p.agency or '—' }}</span></td>
+                  <td>{{ p.start|dmy }}</td><td>{{ p.deadline|dmy }}</td>
+                  <td><span class="badge-soft {{ 'ok' if p.state == 'completed' else 'bad' if p.state == 'overdue' else 'warn' }}">{{ p.state }}</span></td>
+                  <td class="num">{{ p.target|inr }}</td><td class="num">{{ p.rem|inr }}</td><td class="num {{ pctcls(p.pct) }}">{{ p.pct|pct }}</td>
+                  <td class="num">{{ p.expected|inr }}</td><td class="num">{{ p.disp|inr }}</td><td class="num {{ pctcls(p.disp_exp_pct) }}">{{ '%.1f'|format(p.disp_exp_pct) }}%</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+              <tfoot><tr><td>Net</td><td colspan="3"></td><td class="num">{{ c.net.target|inr }}</td><td class="num">{{ c.net.rem|inr }}</td><td class="num">{{ c.net.pct|pct }}</td><td class="num">{{ c.net.expected|inr }}</td><td class="num">{{ c.net.disp|inr }}</td><td class="num">{{ '%.1f'|format(c.net.disp_exp_pct) }}%</td></tr></tfoot>
+            </table>
+          </section>
+
+          {# --- pace --- #}
+          <section class="u-blk u-pace {{ 'is-ok' if c.pace.kind == 'completed' or c.pace.on_track else 'is-bad' }}">
+            {% if c.pace.kind == 'completed' %}
+              <div class="u-blk-title">Pace</div>
+              <div class="u-pace-line"><i class="bi bi-check2-circle"></i> All phases completed. Nothing left against the awarded quantity.</div>
+            {% elif c.pace.kind == 'overdue' %}
+              <div class="u-blk-title">Pace</div>
+              <div class="u-pace-line"><i class="bi bi-exclamation-circle"></i> {{ c.pace.label }} closed with <strong>{{ c.pace.remaining|inr }} MT</strong> un-remediated. No open phase to recover it in.</div>
+            {% else %}
+              <div class="u-blk-title">Pace · {{ c.pace.label }} · deadline {{ c.pace.deadline|dmy }}</div>
+              <div class="u-pace-line">
+                {% if c.pace.on_track %}<i class="bi bi-check2-circle"></i> <strong>On track.</strong>{% else %}<i class="bi bi-speedometer2"></i> <strong>Has to speed up.</strong>{% endif %}
+                {{ c.pace.remaining|inr }} MT left ÷ {{ c.pace.capacity|inr }} MT/day = <strong>{{ '%.0f'|format(c.pace.days_needed or 0) }} days</strong> needed;
+                <strong>{{ c.pace.days_left if c.pace.days_left is not none else '—' }} days</strong> left as of {{ today_str }}.
+                {% if c.pace.finish %}At full capacity finishes <strong>{{ c.pace.finish|dmy }}</strong>.{% endif %}
+                {% if not c.pace.on_track and c.pace.need_rate %}Needs <strong>{{ c.pace.need_rate|inr }} MT/day</strong> from today.{% endif %}
+              </div>
+            {% endif %}
+          </section>
         </div>
       </details>
       {% endfor %}

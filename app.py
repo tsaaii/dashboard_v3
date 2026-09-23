@@ -75,6 +75,13 @@ def create_app() -> Flask:
     app.add_template_filter(fmt_int_indian, "inr")
     app.add_template_filter(fmt_pct, "pct")
     app.add_template_filter(fmt_k, "k")
+    def _dmy(v: str) -> str:
+        """ISO date -> '01 Apr 2026'; anything else passes through."""
+        try:
+            return datetime.strptime(v, "%Y-%m-%d").strftime("%d %b %Y")
+        except (TypeError, ValueError):
+            return v or "—"
+    app.add_template_filter(_dmy, "dmy")
     def _without(args: dict, key: str, value: str | None = None) -> dict:
         """Copy of request.args minus one key, or minus one value of a repeated
         key — used by the 'remove this filter' chips."""

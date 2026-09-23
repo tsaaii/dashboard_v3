@@ -16,7 +16,7 @@
    dropdowns and the phase tiles are re-rendered server-side. HTMX is used
    only to pull the first page of rows (and later pages / sorting). #}
 <form id="report-form" class="hcard rp-filters" method="get" action="{{ url_for('reports.reports_view') }}"
-      hx-get="{{ url_for('reports.rows') }}" hx-target="#rows" hx-indicator="#busy"
+      hx-get="{{ url_for('reports.qc_rows' if mode == 'qc' else 'reports.rows') }}" hx-target="#rows" hx-indicator="#busy"
       hx-trigger="load" hx-push-url="false" autocomplete="off">
 
   {# ---- row 1: dates ---- #}
@@ -115,7 +115,19 @@
 {% endif %}
 
 <div class="rp-tablebar">
-  <span class="hcard-title">Records</span>
+  <div class="u-tabs rp-chips" style="margin:0">
+    <label class="{{ 'is-active' if mode == 'records' }}"><input form="report-form" type="radio" name="mode" value="records" {{ 'checked' if mode == 'records' }} hidden><i class="bi bi-table"></i> Records</label>
+    <label class="{{ 'is-active' if mode == 'qc' }}"><input form="report-form" type="radio" name="mode" value="qc" {{ 'checked' if mode == 'qc' }} hidden><i class="bi bi-stopwatch"></i> QC</label>
+  </div>
+  {% if mode == 'qc' %}
+  <div class="qc-ctl">
+    <label>Fast trip &lt;<input form="report-form" class="form-control form-control-sm" type="number" name="min_trip" value="{{ min_trip }}" min="0" step="1">min</label>
+    <label>Fast return &lt;<input form="report-form" class="form-control form-control-sm" type="number" name="min_turn" value="{{ min_turn }}" min="0" step="1">min</label>
+    <label class="qc-chk"><input form="report-form" type="checkbox" name="flagged" value="1" {{ 'checked' if flagged }}> Flagged only</label>
+    <button class="btn btn-sm btn-outline-secondary" type="submit" form="report-form">Apply</button>
+    <span class="text-tertiary small">Trip Δ = out − in · Vehicle Δ = in − same vehicle's previous out, same site &amp; day</span>
+  </div>
+  {% else %}
   <details class="rp-cols ms-auto"><summary class="btn btn-sm btn-outline-secondary">Columns <i class="bi bi-chevron-down"></i></summary>
     <div class="rp-cols-panel">
       {% for key, meta in schema.items() %}
@@ -123,6 +135,7 @@
       {% endfor %}
     </div>
   </details>
+  {% endif %}
 </div>
 
 <div class="hcard p-0 overflow-hidden rp-results">
@@ -141,8 +154,13 @@
     window.clearPreset = function () {
       form.querySelectorAll('input[name=preset]').forEach(function (r) { r.checked = false; });
     };
-    form.addEventListener('change', function (e) {
-      if (e.target.matches('input[type=text], input[type=search], input[type=number]')) return;
+    // Listen on the document, not the form: the mode toggle, phase chips and
+    // column boxes live outside <form> and reach it only via form="report-form",
+    // so their change events never bubble through the form element itself.
+    document.addEventListener('change', function (e) {
+      var el = e.target;
+      if (!el || el.form !== form) return;
+      if (el.matches('input[type=text], input[type=search], input[type=number]')) return;
       form.submit();
     });
   })();

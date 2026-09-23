@@ -1,59 +1,83 @@
-{# Printable ticket sheet. Deliberately NOT themed: this is the on-screen twin
-   of enhanced_pdf_creator.py's output (T28334.pdf) — black on white, centred
-   headings, ruled tables — so what you print matches the PDF you already
-   circulate. #}
+{# Image viewer: 2x2 photos at their natural aspect (object-fit: contain, no
+   cropping) with a details rail on the right. Click a photo to open the full
+   JPEG in a new tab. The A4 ticket-sheet layout was dropped because the
+   62 mm cells were downscaling the captures past legibility. #}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>Ticket No: {{ ticket }}</title>
+  <title>{{ ticket }} · {{ record.vehicle_no or '' }} · {{ record.site_name or site }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/ticket.css') }}">
 </head>
 <body>
-<button class="tk-print" onclick="window.print()">Print</button>
+<div class="iv">
+  <div class="iv-grid">
+    {% for t in tiles %}
+    <figure class="iv-tile">
+      <figcaption>{{ t.caption }}</figcaption>
+      <a href="{{ t.url }}" target="_blank" rel="noopener" title="Open full size">
+        <img src="{{ t.url }}" alt="{{ t.caption }}" loading="eager"
+             onerror="this.parentNode.innerHTML='<div class=&quot;iv-missing&quot;>Image not available</div>'">
+      </a>
+    </figure>
+    {% endfor %}
+  </div>
 
-<div class="tk-page">
-  <header class="tk-head">
-    <h1>{{ record.agency_name or agency or '—' }}</h1>
-    {% if address %}<p class="tk-addr">{{ address }}</p>{% endif %}
-  </header>
+  <aside class="iv-side">
+    <nav class="iv-nav">
+      {% if nav.prev %}<a class="iv-arrow" href="{{ nav.prev }}" title="Previous trip {{ nav.prev_ticket }}" accesskey="p">&larr;</a>{% else %}<span class="iv-arrow is-off" title="First trip of the day">&larr;</span>{% endif %}
+      <span class="iv-navtxt">{% if nav.pos %}Trip {{ nav.pos }} of {{ nav.count }}{% else %}This trip{% endif %}<span class="iv-dim"> · same vehicle, same day</span></span>
+      {% if nav.next %}<a class="iv-arrow" href="{{ nav.next }}" title="Next trip {{ nav.next_ticket }}" accesskey="n">&rarr;</a>{% else %}<span class="iv-arrow is-off" title="Last trip of the day">&rarr;</span>{% endif %}
+    </nav>
+    <div class="iv-ticket">{{ ticket }}</div>
+    <div class="iv-veh">{{ record.vehicle_no or '—' }}</div>
+    <div class="iv-sub">{{ record.site_name or site }} · {{ record.date or date }}{% if record.time %} · {{ record.time }}{% endif %}</div>
 
-  <p class="tk-printed">Print Date: {{ printed }}</p>
-  <h2 class="tk-ticket">Ticket No: {{ ticket }}</h2>
+    <table class="iv-tbl">
+      <tr><th colspan="2">Weighment</th></tr>
+      <tr><td>First weight</td><td class="num">{{ first_w }}</td></tr>
+      <tr><td>First time</td><td class="num">{{ record.first_timestamp or 'Not captured' }}</td></tr>
+      <tr><td>Second weight</td><td class="num">{{ second_w }}</td></tr>
+      <tr><td>Second time</td><td class="num">{{ record.second_timestamp or 'Not captured' }}</td></tr>
+      <tr class="iv-net"><td>Net weight</td><td class="num">{{ net }}</td></tr>
+      {% if record.trip_delta %}<tr><td>Trip duration</td><td class="num">{{ record.trip_delta }}</td></tr>{% endif %}
+      {% if record.vehicle_delta %}<tr><td>Since previous trip</td><td class="num">{{ record.vehicle_delta }}{% if record.previous_ticket_no %} <span class="iv-dim">({{ record.previous_ticket_no }})</span>{% endif %}</td></tr>{% endif %}
+    </table>
 
-  <h3 class="tk-section">VEHICLE INFORMATION</h3>
-  <table class="tk-info">
-    <tr><th>Vehicle No:</th><td>{{ record.vehicle_no or '' }}</td>
-        <th>Date:</th><td>{{ record.date or date }}</td>
-        <th>Time:</th><td>{{ record.time or '' }}</td></tr>
-    <tr><th>Material:</th><td>{{ record.material or record.material_type or '' }}</td>
-        <th>Site Name:</th><td>{{ record.site_name or site }}</td>
-        <th>Transfer Party:</th><td>{{ record.transfer_party_name or '' }}</td></tr>
-    <tr><th>Agency Name:</th><td>{{ record.agency_name or '' }}</td>
-        <th>User Name:</th><td>{{ record.user_name or '' }}</td>
-        <th>Site Incharge:</th><td>{{ record.site_incharge or '' }}</td></tr>
-  </table>
+    <table class="iv-tbl">
+      <tr><th colspan="2">Record</th></tr>
+      <tr><td>Material</td><td>{{ record.material or record.material_type or '—' }}</td></tr>
+      <tr><td>Transfer party</td><td>{{ record.transfer_party_name or '—' }}</td></tr>
+      <tr><td>Agency</td><td>{{ record.agency_name or agency or '—' }}</td></tr>
+      <tr><td>Site incharge</td><td>{{ record.site_incharge or '—' }}</td></tr>
+      <tr><td>User</td><td>{{ record.user_name or '—' }}</td></tr>
+      <tr><td>Status</td><td>{{ record.record_status or '—' }}</td></tr>
+      <tr><td>Uploaded</td><td class="num">{{ record.cloud_upload_timestamp or '—' }}</td></tr>
+    </table>
 
-  <h3 class="tk-section">WEIGHMENT DETAILS</h3>
-  <table class="tk-weigh">
-    <tr><td>First Weight:</td><td>{{ first_w }}</td><td>First Time:</td><td>{{ record.first_timestamp or 'Not captured' }}</td></tr>
-    <tr><td>Second Weight:</td><td>{{ second_w }}</td><td>Second Time:</td><td>{{ record.second_timestamp or 'Not captured' }}</td></tr>
-    <tr><td></td><td></td><td class="tk-b">Net Weight:</td><td class="tk-b">{{ net }}</td></tr>
-  </table>
+    {% if nav.trips|length > 1 %}
+    <table class="iv-tbl iv-trips">
+      <tr><th colspan="3">Trips today</th></tr>
+      {% for t in nav.trips %}
+      <tr class="{{ 'is-cur' if t.cur }}"><td>{% if t.cur %}{{ t.ticket }}{% else %}<a href="{{ t.url }}">{{ t.ticket }}</a>{% endif %}</td><td class="num">{{ t.in or '—' }}</td><td class="num">{% if t.delta %}+{{ t.delta }}{% else %}<span class="iv-dim">first</span>{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
 
-  <h3 class="tk-section">VEHICLE IMAGES (4-Image System)</h3>
-  {# Slot order is views/record_images.SLOTS. The proxy 404s on an uncaptured
-     slot, so onerror covers every combination of present and missing. #}
-  <table class="tk-imgs">
-    <tr>{% for t in tiles[:2] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
-    <tr>{% for t in tiles[:2] %}<td><img src="{{ t.url }}" alt="{{ t.caption }}"
-        onerror="this.parentNode.innerHTML='<div class=&quot;tk-missing&quot;>Image not available</div>'"></td>{% endfor %}</tr>
-    <tr>{% for t in tiles[2:] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
-    <tr>{% for t in tiles[2:] %}<td><img src="{{ t.url }}" alt="{{ t.caption }}"
-        onerror="this.parentNode.innerHTML='<div class=&quot;tk-missing&quot;>Image not available</div>'"></td>{% endfor %}</tr>
-  </table>
+    <button class="iv-print" onclick="window.print()">Print</button>
+    <div class="iv-dim iv-printed">Printed {{ printed }}</div>
+  </aside>
 </div>
+<script>
+  // ← / → keys step between trips of the same vehicle on the same day.
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    var a = e.key === 'ArrowLeft' ? document.querySelector('a.iv-arrow[accesskey=p]')
+          : e.key === 'ArrowRight' ? document.querySelector('a.iv-arrow[accesskey=n]') : null;
+    if (a) location.href = a.href;
+  });
+</script>
 </body>
 </html>
