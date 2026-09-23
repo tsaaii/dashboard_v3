@@ -17,7 +17,7 @@
     {% for t in tiles %}
     <figure class="iv-tile">
       <figcaption>{{ t.caption }}</figcaption>
-      <a href="{{ t.url }}" target="_blank" rel="noopener" title="Open full size">
+      <a href="{{ t.url }}" data-idx="{{ loop.index0 }}" data-caption="{{ t.caption }}" class="iv-open" title="Open">
         <img src="{{ t.url }}" alt="{{ t.caption }}" loading="eager"
              onerror="this.parentNode.innerHTML='<div class=&quot;iv-missing&quot;>Image not available</div>'">
       </a>
@@ -28,56 +28,136 @@
   <aside class="iv-side">
     <nav class="iv-nav">
       {% if nav.prev %}<a class="iv-arrow" href="{{ nav.prev }}" title="Previous trip {{ nav.prev_ticket }}" accesskey="p">&larr;</a>{% else %}<span class="iv-arrow is-off" title="First trip of the day">&larr;</span>{% endif %}
-      <span class="iv-navtxt">{% if nav.pos %}Trip {{ nav.pos }} of {{ nav.count }}{% else %}This trip{% endif %}<span class="iv-dim"> · same vehicle, same day</span></span>
+      <span class="iv-navtxt">{% if nav.pos %}Trip {{ nav.pos }} of {{ nav.count }}{% else %}This trip{% endif %}</span>
       {% if nav.next %}<a class="iv-arrow" href="{{ nav.next }}" title="Next trip {{ nav.next_ticket }}" accesskey="n">&rarr;</a>{% else %}<span class="iv-arrow is-off" title="Last trip of the day">&rarr;</span>{% endif %}
     </nav>
-    <div class="iv-ticket">{{ ticket }}</div>
-    <div class="iv-veh">{{ record.vehicle_no or '—' }}</div>
-    <div class="iv-sub">{{ record.site_name or site }} · {{ record.date or date }}{% if record.time %} · {{ record.time }}{% endif %}</div>
 
-    <table class="iv-tbl">
-      <tr><th colspan="2">Weighment</th></tr>
-      <tr><td>First weight</td><td class="num">{{ first_w }}</td></tr>
-      <tr><td>First time</td><td class="num">{{ record.first_timestamp or 'Not captured' }}</td></tr>
-      <tr><td>Second weight</td><td class="num">{{ second_w }}</td></tr>
-      <tr><td>Second time</td><td class="num">{{ record.second_timestamp or 'Not captured' }}</td></tr>
-      <tr class="iv-net"><td>Net weight</td><td class="num">{{ net }}</td></tr>
-      {% if record.trip_delta %}<tr><td>Trip duration</td><td class="num">{{ record.trip_delta }}</td></tr>{% endif %}
-      {% if record.vehicle_delta %}<tr><td>Since previous trip</td><td class="num">{{ record.vehicle_delta }}{% if record.previous_ticket_no %} <span class="iv-dim">({{ record.previous_ticket_no }})</span>{% endif %}</td></tr>{% endif %}
-    </table>
+    <header class="iv-hero">
+      <div class="iv-ticket">{{ ticket }}</div>
+      <div class="iv-veh">{{ record.vehicle_no or '—' }}</div>
+      <div class="iv-sub">{{ record.site_name or site }} · {{ record.date or date }}{% if record.time %} · {{ record.time }}{% endif %}</div>
+    </header>
 
-    <table class="iv-tbl">
-      <tr><th colspan="2">Record</th></tr>
-      <tr><td>Material</td><td>{{ record.material or record.material_type or '—' }}</td></tr>
-      <tr><td>Transfer party</td><td>{{ record.transfer_party_name or '—' }}</td></tr>
-      <tr><td>Agency</td><td>{{ record.agency_name or agency or '—' }}</td></tr>
-      <tr><td>Site incharge</td><td>{{ record.site_incharge or '—' }}</td></tr>
-      <tr><td>User</td><td>{{ record.user_name or '—' }}</td></tr>
-      <tr><td>Status</td><td>{{ record.record_status or '—' }}</td></tr>
-      <tr><td>Uploaded</td><td class="num">{{ record.cloud_upload_timestamp or '—' }}</td></tr>
-    </table>
+    <div class="iv-kpis">
+      <div class="iv-kpi"><span class="iv-kpi-l">Net weight</span><span class="iv-kpi-v">{{ net }}</span></div>
+      <div class="iv-kpi"><span class="iv-kpi-l">Material</span><span class="iv-kpi-v iv-kpi-txt">{{ record.material or record.material_type or '—' }}</span></div>
+      <div class="iv-kpi"><span class="iv-kpi-l">Trip duration<small>in → out, this ticket</small></span><span class="iv-kpi-v">{% if trip_min %}{{ trip_min }} <em>min</em>{% else %}—{% endif %}</span></div>
+      <div class="iv-kpi"><span class="iv-kpi-l">Since previous trip{% if nav.prev_ticket %}<small>after <a href="{{ nav.prev }}">{{ nav.prev_ticket }}</a></small>{% endif %}</span><span class="iv-kpi-v">{% if not nav.prev_ticket %}<em>first trip today</em>{% elif vdelta_min %}{{ vdelta_min }} <em>min</em>{% else %}—{% endif %}</span></div>
+    </div>
 
     {% if nav.trips|length > 1 %}
-    <table class="iv-tbl iv-trips">
-      <tr><th colspan="3">Trips today</th></tr>
-      {% for t in nav.trips %}
-      <tr class="{{ 'is-cur' if t.cur }}"><td>{% if t.cur %}{{ t.ticket }}{% else %}<a href="{{ t.url }}">{{ t.ticket }}</a>{% endif %}</td><td class="num">{{ t.in or '—' }}</td><td class="num">{% if t.delta %}+{{ t.delta }}{% else %}<span class="iv-dim">first</span>{% endif %}</td></tr>
-      {% endfor %}
-    </table>
+    <div class="iv-trips-wrap">
+      <div class="iv-h">Trips today</div>
+      <table class="iv-trips">
+        <thead><tr><th>Ticket</th><th class="num">Vehicle Δ</th><th class="num">Trip Δ</th></tr></thead>
+        <tbody>
+        {% for t in nav.trips %}
+        <tr class="{{ 'is-cur' if t.cur }}">
+          <td>{% if t.cur %}{{ t.ticket }}{% else %}<a href="{{ t.url }}">{{ t.ticket }}</a>{% endif %}<small>{{ t.in }}</small></td>
+          <td class="num">{% if t.vdelta %}{{ t.vdelta }} <em>min</em>{% else %}<em>first</em>{% endif %}</td>
+          <td class="num">{% if t.trip %}{{ t.trip }} <em>min</em>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% endif %}
 
-    <button class="iv-print" onclick="window.print()">Print</button>
+    <a class="iv-print" href="{{ url_for('record_images.ticket_pdf', site=site, date=date, ticket=ticket) }}" target="_blank" rel="noopener">Print ticket (PDF)</a>
     <div class="iv-dim iv-printed">Printed {{ printed }}</div>
   </aside>
 </div>
+
+{# Ctrl+P fallback — mirrors the PDF's section order and headings. #}
+<div class="ps">
+  <h1>{{ record.agency_name or agency or '' }}</h1>
+  <p class="ps-addr">{{ record.site_name or site }} Dump yard, {{ record.site_name or site }}, Andhra Pradesh</p>
+  <p class="ps-printed">Print Date: {{ record.date or date }} {{ record.time or '' }}</p>
+  <h1>Ticket No: {{ ticket }}</h1>
+  <h2>VEHICLE INFORMATION</h2>
+  <table class="ps-info">
+    <tr><th>Vehicle No:</th><td>{{ record.vehicle_no or '' }}</td><th>Date:</th><td>{{ record.date or date }}</td><th>Time:</th><td>{{ record.time or '' }}</td></tr>
+    <tr><th>Material:</th><td>{{ record.material or record.material_type or '' }}</td><th>Site Name:</th><td>{{ record.site_name or site }}</td><th>Transfer Party:</th><td>{{ record.transfer_party_name or '' }}</td></tr>
+    <tr><th>Agency Name:</th><td>{{ record.agency_name or '' }}</td><th>User Name:</th><td>{{ record.user_name or 'Not specified' }}</td><th>Site Incharge:</th><td>{{ record.site_incharge or 'Not specified' }}</td></tr>
+  </table>
+  <h2>WEIGHMENT DETAILS</h2>
+  <table class="ps-weigh">
+    <tr><td>First Weight:</td><td>{{ first_w }}</td><td>First Time:</td><td>{{ record.first_timestamp or 'Not captured' }}</td></tr>
+    <tr><td>Second Weight:</td><td>{{ second_w }}</td><td>Second Time:</td><td>{{ record.second_timestamp or 'Not captured' }}</td></tr>
+    <tr><td></td><td></td><td class="ps-b">Net Weight:</td><td class="ps-b">{{ net }}</td></tr>
+  </table>
+  <h2>VEHICLE IMAGES (4-Image System)</h2>
+  <table class="ps-imgs">
+    <tr>{% for t in tiles[:2] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
+    <tr>{% for t in tiles[:2] %}<td><img src="{{ t.url }}" alt="" onerror="this.parentNode.textContent='Image not available'"></td>{% endfor %}</tr>
+    <tr>{% for t in tiles[2:] %}<th>{{ t.caption }}</th>{% endfor %}</tr>
+    <tr>{% for t in tiles[2:] %}<td><img src="{{ t.url }}" alt="" onerror="this.parentNode.textContent='Image not available'"></td>{% endfor %}</tr>
+  </table>
+</div>
+<div class="lb" id="lb" hidden>
+  <button class="lb-close" id="lb-close" title="Close (Esc)">&#x2715;</button>
+  <div class="lb-cap" id="lb-cap"></div>
+  <button class="lb-arrow lb-prev" id="lb-prev" title="Previous image (←)">&#8249;</button>
+  <div class="lb-stage" id="lb-stage"><img id="lb-img" alt=""></div>
+  <button class="lb-arrow lb-next" id="lb-next" title="Next image (→)">&#8250;</button>
+  <div class="lb-hint">scroll to zoom · drag to pan · double-click resets</div>
+</div>
 <script>
-  // ← / → keys step between trips of the same vehicle on the same day.
+(function () {
+  // ---- lightbox: overlay, wheel zoom, drag pan, ‹ › between the four captures
+  var tiles = Array.prototype.slice.call(document.querySelectorAll('a.iv-open')).map(function (a) {
+    return { url: a.getAttribute('href'), caption: a.getAttribute('data-caption') };
+  });
+  var lb = document.getElementById('lb'), img = document.getElementById('lb-img'), stage = document.getElementById('lb-stage'),
+      cap = document.getElementById('lb-cap'), cur = 0, scale = 1, tx = 0, ty = 0, drag = null;
+
+  function apply() { img.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
+  function reset() { scale = 1; tx = 0; ty = 0; apply(); }
+  function show(i) {
+    cur = (i + tiles.length) % tiles.length;
+    img.src = tiles[cur].url; img.alt = tiles[cur].caption;
+    cap.textContent = tiles[cur].caption + '  ·  ' + (cur + 1) + ' / ' + tiles.length;
+    reset();
+  }
+  function open(i) { lb.hidden = false; document.body.style.overflow = 'hidden'; show(i); }
+  function close() { lb.hidden = true; document.body.style.overflow = ''; }
+
+  document.querySelectorAll('a.iv-open').forEach(function (a) {
+    a.addEventListener('click', function (e) { e.preventDefault(); open(+a.getAttribute('data-idx')); });
+  });
+  document.getElementById('lb-close').addEventListener('click', close);
+  document.getElementById('lb-prev').addEventListener('click', function () { show(cur - 1); });
+  document.getElementById('lb-next').addEventListener('click', function () { show(cur + 1); });
+  lb.addEventListener('click', function (e) { if (e.target === lb || e.target === stage) close(); });
+
+  // zoom towards the cursor, so the pixel under the mouse stays put
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = stage.getBoundingClientRect(), mx = e.clientX - r.left - r.width / 2, my = e.clientY - r.top - r.height / 2;
+    var k = e.deltaY < 0 ? 1.15 : 1 / 1.15, ns = Math.min(12, Math.max(1, scale * k)); k = ns / scale;
+    tx = mx - (mx - tx) * k; ty = my - (my - ty) * k; scale = ns;
+    if (scale === 1) { tx = 0; ty = 0; }
+    apply();
+  }, { passive: false });
+  stage.addEventListener('mousedown', function (e) { if (scale > 1) { drag = { x: e.clientX - tx, y: e.clientY - ty }; e.preventDefault(); } });
+  window.addEventListener('mousemove', function (e) { if (drag) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; apply(); } });
+  window.addEventListener('mouseup', function () { drag = null; });
+  stage.addEventListener('dblclick', reset);
+
+  // ---- keys: in the lightbox ← → step images, Esc closes; on the page ← → step trips
   document.addEventListener('keydown', function (e) {
     if (e.target.tagName === 'INPUT') return;
+    if (!lb.hidden) {
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') show(cur - 1);
+      else if (e.key === 'ArrowRight') show(cur + 1);
+      return;
+    }
     var a = e.key === 'ArrowLeft' ? document.querySelector('a.iv-arrow[accesskey=p]')
           : e.key === 'ArrowRight' ? document.querySelector('a.iv-arrow[accesskey=n]') : null;
     if (a) location.href = a.href;
   });
+})();
 </script>
 </body>
 </html>

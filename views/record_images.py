@@ -32,6 +32,7 @@ from flask import Blueprint, Response, abort, current_app, render_template, sess
 
 import config
 from data import master, records_api
+from data import ticket_pdf as ticket_pdf_mod
 from views.login import SESSION_USER_KEY
 from views.sites import SESSION_SITE_KEY
 
@@ -188,6 +189,23 @@ def sheet_view(site, date, ticket):
             address = (getattr(st, "address", "") or "").strip()
             break
 
+    def mins(rec: dict, secs_key: str, hms_key: str) -> str:
+        """API gives both '01:43:21' and seconds; show whole minutes."""
+        v = rec.get(secs_key)
+        if v in (None, ""):
+            hms = str(rec.get(hms_key) or "").strip()
+            if not hms:
+                return ""
+            try:
+                h, m, sec = (int(x) for x in hms.split(":"))
+                v = h * 3600 + m * 60 + sec
+            except ValueError:
+                return hms
+        try:
+            return f"{round(float(v) / 60):,}"
+        except (TypeError, ValueError):
+            return ""
+
     # previous / next trip of the same vehicle on the same day
     trips = _vehicle_day(site, date, (r.get("vehicle_no") or "").strip())
     idx = next((i for i, t in enumerate(trips) if str(t.get("ticket_no", "")).strip() == ticket.strip()), None)
@@ -196,20 +214,22 @@ def sheet_view(site, date, ticket):
         return url_for("record_images.sheet_view", site=site, date=date, ticket=str(t.get("ticket_no")))
     prev_t = trips[idx - 1] if idx not in (None, 0) else None
     next_t = trips[idx + 1] if idx is not None and idx + 1 < len(trips) else None
-    if prev_t is None and r.get("previous_ticket_no"):          # API knows the previous even if the list lookup failed
-        prev_t = {"ticket_no": r["previous_ticket_no"]}
+    # No fallback to previous_ticket_no: if the day list didn't confirm a
+    # neighbour, the arrow stays grey. A single-trip day must show both off.
     nav = {
         "prev": link(prev_t) if prev_t else "", "prev_ticket": str(prev_t.get("ticket_no", "")) if prev_t else "",
         "next": link(next_t) if next_t else "", "next_ticket": str(next_t.get("ticket_no", "")) if next_t else "",
         "pos": (idx + 1) if idx is not None else None, "count": len(trips),
         "trips": [{"ticket": str(t.get("ticket_no", "")), "url": link(t), "cur": i == idx,
-                   "in": str(t.get("first_timestamp") or "")[-8:-3], "net": t.get("net_weight"),
-                   "delta": t.get("vehicle_delta") or ""} for i, t in enumerate(trips)],
+                   "in": str(t.get("first_timestamp") or "")[-8:-3],
+                   "trip": mins(t, "trip_seconds", "trip_delta"),
+                   "vdelta": mins(t, "vehicle_delta_seconds", "vehicle_delta")} for i, t in enumerate(trips)],
     }
 
     return render_template(
         "record_images.html", ticket=ticket, site=site, date=r.get("date") or date, nav=nav,
         record=r, tiles=tiles, address=address, agency=r.get("agency_name", ""),
+        trip_min=mins(r, "trip_seconds", "trip_delta"), vdelta_min=mins(r, "vehicle_delta_seconds", "vehicle_delta"),
         first_w=kg(r.get("first_weight")), second_w=kg(r.get("second_weight")), net=kg(r.get("net_weight")),
         printed=datetime.now(config.IST).strftime("%d-%m-%Y %H:%M:%S"))
 
@@ -222,10 +242,19 @@ def image_proxy(site, date, ticket, slot):
     if not _authorized(site):
         abort(403)
 
+    blob = _image_bytes(site, date, ticket, slot)
+    if blob is None:
+        abort(404)
+    return _respond(blob[1], blob[0], blob[2])
+
+
+def _image_bytes(site: str, date: str, ticket: str, slot: str):
+    """(ctype, bytes, cache_state) for one slot, or None if never captured.
+    Aborts 429/502 on upstream trouble, exactly as the proxy always did."""
     key = f"{site}|{date}|{ticket}|{slot}"
     cached = _cache_get(key)
     if cached is not None:
-        return _respond(cached[1], cached[0], "HIT")
+        return cached[0], cached[1], "HIT"
 
     url = (f"{config.RECORDS_API_BASE}/records/{quote(site, safe='')}"
            f"/{quote(date, safe='')}/{quote(ticket, safe='')}/image/{slot}")
@@ -235,11 +264,9 @@ def image_proxy(site, date, ticket, slot):
         current_app.logger.warning("image proxy request failed %s: %s", url, exc)
         abort(502)
 
-    # 404 is normal — the slot was never captured. The template's onerror turns
-    # it into "No image in this slot", so pass it through rather than
-    # substituting a placeholder here.
+    # 404 is normal — the slot was never captured.
     if r.status_code == 404:
-        abort(404)
+        return None
     if r.status_code == 429:
         current_app.logger.warning("image proxy rate-limited upstream — consider raising the cache TTL")
         abort(429)
@@ -249,7 +276,29 @@ def image_proxy(site, date, ticket, slot):
 
     ctype = r.headers.get("Content-Type", "image/jpeg")
     _cache_put(key, ctype, r.content)
-    return _respond(r.content, ctype, "MISS")
+    return ctype, r.content, "MISS"
+
+
+@bp.route("/<site>/<date>/<ticket>/ticket.pdf")
+def ticket_pdf(site, date, ticket):
+    """The weighbridge ticket PDF — same layout as enhanced_pdf_creator's
+    create_pdf_report, built from the API record and the four API images."""
+    if not _authorized(site):
+        abort(403)
+    r = _record(site, date, ticket)
+    if not r:
+        abort(404)
+    images = {}
+    for slot in SLOT_KEYS:
+        got = _image_bytes(site, date, ticket, slot)
+        images[slot] = got[1] if got else None
+    pdf = ticket_pdf_mod.build(r, images)
+    fname = f"{ticket}_{(r.get('vehicle_no') or '').replace(' ', '')}.pdf"
+    return Response(pdf, mimetype="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{fname}"',
+        "Cache-Control": "private, max-age=3600",
+        "X-Robots-Tag": "noindex, nofollow, noarchive",
+    })
 
 
 def _respond(blob: bytes, ctype: str, cache_state: str) -> Response:
